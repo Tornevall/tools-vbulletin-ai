@@ -39,45 +39,65 @@ class vbulletinbytools_Api_Ai extends vB_Api
 
     public function personaDebug()
     {
-        $options = vB::getDatastore()->getValue('options');
+        try {
+            $options = vB::getDatastore()->getValue('options');
 
-        $personaFieldId = $this->getOptionInt($options, 'tornis_tools_gpt_persona_field', 0);
-        $userid = $this->getCurrentUserId();
-        $persona = '';
+            $personaFieldId = $this->getOptionInt($options, 'tornis_tools_gpt_persona_field', 0);
+            $userid = $this->getCurrentUserId();
+            $username = $this->getUsernameByUserId($userid);
+            $persona = '';
 
-        if ($personaFieldId > 0) {
-            $persona = $this->getCurrentUserPersona($personaFieldId);
+            if ($personaFieldId > 0) {
+                $persona = $this->getCurrentUserPersona($personaFieldId);
+            }
+
+            return array(
+                'ok' => true,
+                'userid' => $userid,
+                'username' => $username,
+                'persona_field_id' => $personaFieldId,
+                'persona_field_name' => ($personaFieldId > 0 ? 'field' . $personaFieldId : ''),
+                'has_persona' => ($persona !== ''),
+                'persona_length' => strlen($persona),
+            );
+        } catch (Throwable $e) {
+            return $this->apiSafeError('personaDebug failed', $e);
         }
-
-        return array(
-            'ok' => true,
-            'userid' => $userid,
-            'persona_field_id' => $personaFieldId,
-            'persona_field_name' => ($personaFieldId > 0 ? 'field' . $personaFieldId : ''),
-            'has_persona' => ($persona !== ''),
-            'persona_length' => strlen($persona),
-        );
     }
 
     public function threadDebug($nodeid = 0)
     {
-        $nodeid = (int) $nodeid;
-        $threadContext = '';
+        try {
+            $nodeid = (int) $nodeid;
+            $threadContext = '';
 
-        if ($nodeid > 0) {
-            $threadContext = $this->getThreadContextFromNodeId($nodeid);
+            if ($nodeid > 0) {
+                $threadContext = $this->getThreadContextFromNodeId($nodeid);
+            }
+
+            return array(
+                'ok' => true,
+                'nodeid' => $nodeid,
+                'has_thread_context' => ($threadContext !== ''),
+                'thread_context_length' => strlen($threadContext),
+                'thread_context_preview' => substr($threadContext, 0, 1200),
+            );
+        } catch (Throwable $e) {
+            return $this->apiSafeError('threadDebug failed', $e);
         }
-
-        return array(
-            'ok' => true,
-            'nodeid' => $nodeid,
-            'has_thread_context' => ($threadContext !== ''),
-            'thread_context_length' => strlen($threadContext),
-            'thread_context_preview' => substr($threadContext, 0, 1200),
-        );
     }
 
     public function respond($context = '', $prompt = '', $language = 'sv', $nodeid = 0)
+    {
+        try {
+            return $this->respondInternal($context, $prompt, $language, $nodeid);
+        } catch (Throwable $e) {
+            error_log('vbulletinbytools respond failed: ' . $e->getMessage());
+            return $this->apiSafeError('AI endpoint failed', $e);
+        }
+    }
+
+    private function respondInternal($context = '', $prompt = '', $language = 'sv', $nodeid = 0)
     {
         $context = trim((string) $context);
         $prompt = trim((string) $prompt);
@@ -85,13 +105,23 @@ class vbulletinbytools_Api_Ai extends vB_Api
         $nodeid = (int) $nodeid;
 
         if ($prompt === '') {
-            throw new vB_Exception_Api('Prompt is required.');
+            return array(
+                'ok' => true,
+                'gateway_ok' => false,
+                'error' => 'Prompt is required.',
+                'text' => 'Prompt is required.',
+            );
         }
 
         $options = vB::getDatastore()->getValue('options');
 
         if (empty($options['tornis_tools_ai_enabled'])) {
-            throw new vB_Exception_Api('Tornevall Tools AI is disabled.');
+            return array(
+                'ok' => true,
+                'gateway_ok' => false,
+                'error' => 'Tornevall Tools AI is disabled.',
+                'text' => 'Tornevall Tools AI is disabled.',
+            );
         }
 
         $token = '';
@@ -100,7 +130,12 @@ class vbulletinbytools_Api_Ai extends vB_Api
         }
 
         if ($token === '') {
-            throw new vB_Exception_Api('Tornevall Tools API token is missing.');
+            return array(
+                'ok' => true,
+                'gateway_ok' => false,
+                'error' => 'Tornevall Tools API token is missing.',
+                'text' => 'Tornevall Tools API token is missing.',
+            );
         }
 
         $baseUrl = 'https://tools.tornevall.net';
@@ -115,6 +150,7 @@ class vbulletinbytools_Api_Ai extends vB_Api
 
         $personaFieldId = $this->getOptionInt($options, 'tornis_tools_gpt_persona_field', 0);
         $userid = $this->getCurrentUserId();
+        $username = $this->getUsernameByUserId($userid);
         $persona = '';
 
         if ($personaFieldId > 0) {
@@ -130,12 +166,21 @@ class vbulletinbytools_Api_Ai extends vB_Api
             $context = trim($context . "\n\nServer-side vBulletin thread context:\n" . $threadContext);
         }
 
-        $fullContext = $this->buildFullContext($context, $persona, $personaFieldId);
+        $fullContext = $this->buildFullContext($context, $persona, $personaFieldId, $userid, $username);
 
         $useWebSearch = !empty($options['tornis_tools_ai_web_search_enabled']);
         $webSearchRequired = !empty($options['tornis_tools_ai_web_search_required']);
 
         require_once(DIR . '/packages/vbulletinbytools/library/TornevallTools/OpenAiClient.php');
+
+        if (!class_exists('TornevallTools_OpenAiClient')) {
+            return array(
+                'ok' => true,
+                'gateway_ok' => false,
+                'error' => 'TornevallTools_OpenAiClient was not loaded.',
+                'text' => 'TornevallTools_OpenAiClient was not loaded. Check package file path.',
+            );
+        }
 
         $client = new TornevallTools_OpenAiClient($baseUrl, $token);
 
@@ -148,6 +193,7 @@ class vbulletinbytools_Api_Ai extends vB_Api
             'web_search_required' => $webSearchRequired,
             'vbulletin' => array(
                 'userid' => $userid,
+                'username' => $username,
                 'nodeid' => $nodeid,
                 'has_thread_context' => ($threadContext !== ''),
                 'thread_context_length' => strlen($threadContext),
@@ -158,10 +204,25 @@ class vbulletinbytools_Api_Ai extends vB_Api
         ));
     }
 
-    private function buildFullContext($context, $persona, $personaFieldId)
+    private function buildFullContext($context, $persona, $personaFieldId, $userid, $username)
     {
         $context = trim((string) $context);
         $persona = trim((string) $persona);
+        $userid = (int) $userid;
+        $username = trim((string) $username);
+
+        $currentUserLines = array(
+            'Current vBulletin user identity:',
+            'User ID: ' . $userid,
+        );
+
+        if ($username !== '') {
+            $currentUserLines[] = 'Username: ' . $username;
+        }
+
+        $currentUserLines[] = 'When drafting, rewriting or answering in a thread, write as the current vBulletin user above.';
+        $currentUserLines[] = 'Do not describe the current user in third person unless the user explicitly asks for that.';
+        $currentUserLines[] = 'Use first person when the requested text is meant to be posted by the current user.';
 
         $outputRules = implode("\n", array(
             'Output rules:',
@@ -176,6 +237,7 @@ class vbulletinbytools_Api_Ai extends vB_Api
         if ($persona !== '') {
             return implode("\n\n", array(
                 $outputRules,
+                implode("\n", $currentUserLines),
                 'Mandatory writing persona for the current vBulletin user:',
                 $persona,
                 'Persona rule:',
@@ -187,9 +249,25 @@ class vbulletinbytools_Api_Ai extends vB_Api
 
         return implode("\n\n", array(
             $outputRules,
+            implode("\n", $currentUserLines),
             'Forum/editor context:',
             $context,
         ));
+    }
+
+    private function apiSafeError($prefix, Throwable $e)
+    {
+        $message = $prefix . ': ' . $e->getMessage();
+
+        return array(
+            'ok' => true,
+            'gateway_ok' => false,
+            'error' => $message,
+            'text' => $message,
+            'exception_class' => get_class($e),
+            'exception_file' => $e->getFile(),
+            'exception_line' => $e->getLine(),
+        );
     }
 
     private function getCurrentUserId()
