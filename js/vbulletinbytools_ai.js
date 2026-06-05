@@ -467,7 +467,7 @@
             .replace(/&/g, "&amp;")
             .replace(/</g, "&lt;")
             .replace(/>/g, "&gt;")
-            .replace(/"/g, "&quot;")
+            .replace(/\"/g, "&quot;")
             .replace(/'/g, "&#039;");
     }
 
@@ -489,11 +489,11 @@
             return token;
         });
 
-        text = text.replace(/!\[([^\]]*)\]\(([^\s)]+)(?:\s+"[^"]*")?\)/g, function (match, alt, url) {
+        text = text.replace(/!\[([^\]]*)\]\(([^\s)]+)(?:\s+\"[^\"]*\")?\)/g, function (match, alt, url) {
             return "[img]" + url + "[/img]";
         });
 
-        text = text.replace(/\[([^\]]+)\]\(([^\s)]+)(?:\s+"[^"]*")?\)/g, function (match, label, url) {
+        text = text.replace(/\[([^\]]+)\]\(([^\s)]+)(?:\s+\"[^\"]*\")?\)/g, function (match, label, url) {
             return "[url=" + url + "]" + label + "[/url]";
         });
 
@@ -638,6 +638,10 @@
             return error.text;
         }
 
+        if (error.message && error.raw_preview) {
+            return error.message + "\nStatus: " + (error.status || "unknown") + "\n\n" + error.raw_preview;
+        }
+
         if (error.raw_preview) {
             return error.raw_preview;
         }
@@ -685,8 +689,9 @@
         return fetch(API_CALL, {
             method: "POST",
             headers: {
-                "Content-Type": "application/x-www-form-urlencoded",
-                "Accept": "application/json"
+                "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
+                "Accept": "application/json, text/javascript, */*; q=0.01",
+                "X-Requested-With": "XMLHttpRequest"
             },
             credentials: "same-origin",
             body: new URLSearchParams({
