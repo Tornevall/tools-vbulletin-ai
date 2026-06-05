@@ -75,6 +75,48 @@
         return document.title || "";
     }
 
+    function getCurrentNodeId() {
+        if (window.pageData) {
+            var pageDataKeys = [
+                "nodeid",
+                "nodeId",
+                "conversationid",
+                "conversationId",
+                "parentid",
+                "parentId",
+                "starter",
+                "starterid",
+                "starterId"
+            ];
+
+            for (var i = 0; i < pageDataKeys.length; i++) {
+                if (window.pageData[pageDataKeys[i]]) {
+                    return parseInt(window.pageData[pageDataKeys[i]], 10) || 0;
+                }
+            }
+        }
+
+        var nodeElement = document.querySelector("[data-node-id], [data-nodeid], [data-node-id32], [data-node]");
+
+        if (nodeElement) {
+            return parseInt(
+                nodeElement.getAttribute("data-node-id") ||
+                nodeElement.getAttribute("data-nodeid") ||
+                nodeElement.getAttribute("data-node-id32") ||
+                nodeElement.getAttribute("data-node"),
+                10
+            ) || 0;
+        }
+
+        var urlMatch = String(window.location.href || "").match(/(?:nodeid|node|p|t|topic)[=\/](\d+)/i);
+
+        if (urlMatch && urlMatch[1]) {
+            return parseInt(urlMatch[1], 10) || 0;
+        }
+
+        return 0;
+    }
+
     function detectInstructionLanguage(text) {
         var value = String(text || "").toLowerCase();
 
@@ -381,13 +423,15 @@
     }
 
     function insertIntoEditor(text) {
+        var bbcode = markdownToBbcode(text);
         var ckeditor = getCkEditorInstance();
 
         if (ckeditor) {
             var current = ckeditor.getData() || "";
-            var separator = current.trim() ? "<p>&nbsp;</p>" : "";
+            var currentText = stripHtml(current).trim();
+            var separator = currentText ? "\n\n" : "";
 
-            ckeditor.setData(current + separator + htmlParagraphs(text));
+            ckeditor.setData(htmlParagraphs(currentText + separator + bbcode));
             return true;
         }
 
@@ -395,7 +439,7 @@
 
         if (textarea) {
             var existing = textarea.value || "";
-            textarea.value = existing + (existing.trim() ? "\n\n" : "") + text;
+            textarea.value = existing + (existing.trim() ? "\n\n" : "") + bbcode;
             textarea.dispatchEvent(new Event("input", { bubbles: true }));
             textarea.dispatchEvent(new Event("change", { bubbles: true }));
             return true;
@@ -404,7 +448,7 @@
         var editable = document.querySelector("[contenteditable='true']");
 
         if (editable) {
-            editable.innerText = (editable.innerText || "") + "\n\n" + text;
+            editable.innerText = (editable.innerText || "") + "\n\n" + bbcode;
             editable.dispatchEvent(new Event("input", { bubbles: true }));
             return true;
         }
@@ -435,6 +479,100 @@
         }).join("");
     }
 
+    function markdownToBbcode(markdown) {
+        var text = String(markdown || "").replace(/\r\n/g, "\n").replace(/\r/g, "\n");
+        var codeBlocks = [];
+
+        text = text.replace(/```([a-z0-9_-]+)?\n([\s\S]*?)```/gi, function (match, language, code) {
+            var token = "@@VBT_CODE_BLOCK_" + codeBlocks.length + "@@";
+            codeBlocks.push("[code]" + trimCodeBlock(code) + "[/code]");
+            return token;
+        });
+
+        text = text.replace(/!\[([^\]]*)\]\(([^\s)]+)(?:\s+"[^"]*")?\)/g, function (match, alt, url) {
+            return "[img]" + url + "[/img]";
+        });
+
+        text = text.replace(/\[([^\]]+)\]\(([^\s)]+)(?:\s+"[^"]*")?\)/g, function (match, label, url) {
+            return "[url=" + url + "]" + label + "[/url]";
+        });
+
+        text = text.replace(/^######\s+(.+)$/gm, "[b]$1[/b]");
+        text = text.replace(/^#####\s+(.+)$/gm, "[b]$1[/b]");
+        text = text.replace(/^####\s+(.+)$/gm, "[b]$1[/b]");
+        text = text.replace(/^###\s+(.+)$/gm, "[b]$1[/b]");
+        text = text.replace(/^##\s+(.+)$/gm, "[b]$1[/b]");
+        text = text.replace(/^#\s+(.+)$/gm, "[b]$1[/b]");
+
+        text = text.replace(/^>\s?(.+)$/gm, "[quote]$1[/quote]");
+        text = convertMarkdownListsToBbcode(text);
+
+        text = text.replace(/\*\*([^*\n][\s\S]*?[^*\n])\*\*/g, "[b]$1[/b]");
+        text = text.replace(/__([^_\n][\s\S]*?[^_\n])__/g, "[b]$1[/b]");
+        text = text.replace(/(^|[^*])\*([^*\n]+)\*(?!\*)/g, "$1[i]$2[/i]");
+        text = text.replace(/(^|[^_])_([^_\n]+)_(?!_)/g, "$1[i]$2[/i]");
+        text = text.replace(/`([^`\n]+)`/g, "[icode]$1[/icode]");
+        text = text.replace(/^\s*---\s*$/gm, "");
+
+        for (var i = 0; i < codeBlocks.length; i++) {
+            text = text.replace("@@VBT_CODE_BLOCK_" + i + "@@", codeBlocks[i]);
+        }
+
+        return text.replace(/\n{3,}/g, "\n\n").trim();
+    }
+
+    function trimCodeBlock(code) {
+        return String(code || "").replace(/^\n+/, "").replace(/\n+$/, "");
+    }
+
+    function convertMarkdownListsToBbcode(text) {
+        var lines = String(text || "").split("\n");
+        var output = [];
+        var listType = "";
+
+        function closeList() {
+            if (listType) {
+                output.push("[/list]");
+                listType = "";
+            }
+        }
+
+        for (var i = 0; i < lines.length; i++) {
+            var line = lines[i];
+            var unordered = line.match(/^\s*[-*+]\s+(.+)$/);
+            var ordered = line.match(/^\s*\d+[.)]\s+(.+)$/);
+
+            if (unordered) {
+                if (listType !== "ul") {
+                    closeList();
+                    output.push("[list]");
+                    listType = "ul";
+                }
+
+                output.push("[*]" + unordered[1]);
+                continue;
+            }
+
+            if (ordered) {
+                if (listType !== "ol") {
+                    closeList();
+                    output.push("[list=1]");
+                    listType = "ol";
+                }
+
+                output.push("[*]" + ordered[1]);
+                continue;
+            }
+
+            closeList();
+            output.push(line);
+        }
+
+        closeList();
+
+        return output.join("\n");
+    }
+
     function extractAiText(response) {
         if (!response) {
             return "";
@@ -442,6 +580,14 @@
 
         if (response.response && typeof response.response.response === "string") {
             return response.response.response;
+        }
+
+        if (response.response && response.response.response && typeof response.response.response.response === "string") {
+            return response.response.response.response;
+        }
+
+        if (response.response && typeof response.response.text === "string") {
+            return response.response.text;
         }
 
         if (response.response && typeof response.response.raw_preview === "string") {
@@ -477,9 +623,11 @@
         var threadContext = getThreadContext();
         var editorText = getEditorText();
         var language = detectInstructionLanguage(promptText);
+        var nodeid = getCurrentNodeId();
 
         var context = [
             "Page: vBulletin editor",
+            nodeid ? "Current node ID:\n" + nodeid : "",
             title ? "Topic title:\n" + title : "",
             breadcrumbs ? "Breadcrumbs:\n" + breadcrumbs : "",
             threadContext ? "Visible thread context:\n" + threadContext : "",
@@ -496,6 +644,7 @@
             "- Do not explain what you are doing unless the user explicitly asks for an explanation.",
             "- Write in the same language as the user's instruction.",
             "- If the user's instruction explicitly asks for a specific language, use that requested language instead.",
+            "- Formatting may be returned as Markdown. The forum client will convert Markdown to BBCode before insertion.",
             "",
             "User request:",
             promptText
@@ -508,7 +657,8 @@
                     data: {
                         context: context,
                         prompt: finalPrompt,
-                        language: language
+                        language: language,
+                        nodeid: nodeid
                     },
                     success: function (response) {
                         resolve(response);
@@ -533,7 +683,8 @@
                 body: new URLSearchParams({
                     context: context,
                     prompt: finalPrompt,
-                    language: language
+                    language: language,
+                    nodeid: nodeid
                 }).toString()
             })
                 .then(function (response) {
@@ -622,7 +773,7 @@
 
             callAi(promptText)
                 .then(function (response) {
-                    lastAnswer = extractAiText(response);
+                    lastAnswer = markdownToBbcode(extractAiText(response));
                     result.textContent = lastAnswer;
                     resultActions.classList.remove("h-hide");
                 })
