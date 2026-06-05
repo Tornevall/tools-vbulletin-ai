@@ -18,10 +18,7 @@ class TornevallTools_OpenAiClient
     public function respond(array $payload): array
     {
         if ($this->token === '') {
-            return array(
-                'ok' => false,
-                'error' => 'Missing Tornevall Tools API token.',
-            );
+            return $this->gatewayFailure('Missing Tornevall Tools API token.', 0, '', '', 0);
         }
 
         $endpoint = $this->baseUrl . '/api/ai/internal/respond';
@@ -32,10 +29,7 @@ class TornevallTools_OpenAiClient
         );
 
         if ($jsonPayload === false) {
-            return array(
-                'ok' => false,
-                'error' => 'Could not encode AI request payload.',
-            );
+            return $this->gatewayFailure('Could not encode AI request payload.', 0, '', '', 0);
         }
 
         $ch = curl_init($endpoint);
@@ -61,11 +55,7 @@ class TornevallTools_OpenAiClient
         curl_close($ch);
 
         if ($rawResponse === false) {
-            return array(
-                'ok' => false,
-                'error' => 'Curl error: ' . $curlError,
-                'request_bytes' => strlen($jsonPayload),
-            );
+            return $this->gatewayFailure('Curl error: ' . $curlError, $httpCode, $contentType, '', strlen($jsonPayload));
         }
 
         $decoded = json_decode($rawResponse, true);
@@ -78,32 +68,70 @@ class TornevallTools_OpenAiClient
             error_log('Tornevall Tools request bytes: ' . strlen($jsonPayload));
             error_log('Tornevall Tools invalid JSON raw preview: ' . $rawPreview);
 
-            return array(
-                'ok' => false,
-                'status' => $httpCode,
-                'content_type' => $contentType,
-                'request_bytes' => strlen($jsonPayload),
-                'response_bytes' => strlen((string) $rawResponse),
-                'error' => 'Invalid JSON response from Tornevall Tools.',
-                'raw_preview' => $rawPreview,
+            return $this->gatewayFailure(
+                'Invalid JSON response from Tornevall Tools.',
+                $httpCode,
+                $contentType,
+                $rawPreview,
+                strlen($jsonPayload),
+                strlen((string) $rawResponse)
             );
         }
 
         if ($httpCode < 200 || $httpCode >= 300) {
-            return array(
-                'ok' => false,
-                'status' => $httpCode,
-                'request_bytes' => strlen($jsonPayload),
-                'error' => $decoded['error'] ?? 'Tornevall Tools returned HTTP ' . $httpCode,
-                'response' => $decoded,
+            return $this->gatewayFailure(
+                $decoded['error'] ?? 'Tornevall Tools returned HTTP ' . $httpCode,
+                $httpCode,
+                $contentType,
+                json_encode($decoded, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
+                strlen($jsonPayload),
+                strlen((string) $rawResponse)
             );
         }
 
         return array(
             'ok' => true,
+            'gateway_ok' => true,
             'status' => $httpCode,
             'request_bytes' => strlen($jsonPayload),
             'response' => $decoded,
+        );
+    }
+
+    private function gatewayFailure(string $message, int $status, string $contentType, string $rawPreview, int $requestBytes, int $responseBytes = 0): array
+    {
+        $text = $message;
+
+        if ($status > 0) {
+            $text .= "\nHTTP status: " . $status;
+        }
+
+        if ($contentType !== '') {
+            $text .= "\nContent-Type: " . $contentType;
+        }
+
+        if ($requestBytes > 0) {
+            $text .= "\nRequest bytes: " . $requestBytes;
+        }
+
+        if ($responseBytes > 0) {
+            $text .= "\nResponse bytes: " . $responseBytes;
+        }
+
+        if ($rawPreview !== '') {
+            $text .= "\n\nRaw preview:\n" . $rawPreview;
+        }
+
+        return array(
+            'ok' => true,
+            'gateway_ok' => false,
+            'status' => $status,
+            'content_type' => $contentType,
+            'request_bytes' => $requestBytes,
+            'response_bytes' => $responseBytes,
+            'error' => $message,
+            'raw_preview' => $rawPreview,
+            'text' => $text,
         );
     }
 }
