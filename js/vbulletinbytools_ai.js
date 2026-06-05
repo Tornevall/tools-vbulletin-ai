@@ -18,390 +18,6 @@
         callback();
     }
 
-    function findEditorContainer() {
-        var candidates = [
-            ".js-editor",
-            ".cke",
-            ".cke_editor_editor",
-            ".editor",
-            ".editor-container",
-            ".conversation-editor",
-            ".js-new-content-text",
-            "textarea[name='text']",
-            "textarea[name='pagetext']",
-            "textarea",
-            "[contenteditable='true']"
-        ];
-
-        for (var i = 0; i < candidates.length; i++) {
-            var element = document.querySelector(candidates[i]);
-
-            if (element) {
-                return element.closest(".editor, .cke, .js-post-editor, .conversation-editor") || element.parentNode;
-            }
-        }
-
-        return null;
-    }
-
-    function getTitleText() {
-        var titleInput = document.querySelector("input[name='title'], input[name='subject'], input[placeholder='Enter title']");
-
-        if (titleInput && titleInput.value) {
-            return titleInput.value;
-        }
-
-        var titleSelectors = [
-            "h1",
-            ".b-page-title",
-            ".conversation-title",
-            ".thread-title",
-            ".topic-title",
-            ".js-topic-title"
-        ];
-
-        for (var i = 0; i < titleSelectors.length; i++) {
-            var titleElement = document.querySelector(titleSelectors[i]);
-
-            if (titleElement) {
-                var text = cleanText(titleElement.innerText || titleElement.textContent || "");
-
-                if (text) {
-                    return text;
-                }
-            }
-        }
-
-        return document.title || "";
-    }
-
-    function getCurrentNodeId() {
-        if (window.pageData) {
-            var pageDataKeys = [
-                "nodeid",
-                "nodeId",
-                "conversationid",
-                "conversationId",
-                "parentid",
-                "parentId",
-                "starter",
-                "starterid",
-                "starterId"
-            ];
-
-            for (var i = 0; i < pageDataKeys.length; i++) {
-                if (window.pageData[pageDataKeys[i]]) {
-                    return parseInt(window.pageData[pageDataKeys[i]], 10) || 0;
-                }
-            }
-        }
-
-        var nodeElement = document.querySelector("[data-node-id], [data-nodeid], [data-node-id32], [data-node]");
-
-        if (nodeElement) {
-            return parseInt(
-                nodeElement.getAttribute("data-node-id") ||
-                nodeElement.getAttribute("data-nodeid") ||
-                nodeElement.getAttribute("data-node-id32") ||
-                nodeElement.getAttribute("data-node"),
-                10
-            ) || 0;
-        }
-
-        var urlMatch = String(window.location.href || "").match(/(?:nodeid|node|p|t|topic)[=\/](\d+)/i);
-
-        if (urlMatch && urlMatch[1]) {
-            return parseInt(urlMatch[1], 10) || 0;
-        }
-
-        return 0;
-    }
-
-    function detectInstructionLanguage(text) {
-        var value = String(text || "").toLowerCase();
-
-        var swedishHits = countMatches(value, [
-            "skriv", "gör", "hjälp", "förklara", "sammanfatta", "översätt",
-            "svenska", "detta", "kort", "långt", "svara", "avskedsbrev",
-            "på svenska", "kan du", "jag vill", "tacka", "beröm"
-        ]);
-
-        var englishHits = countMatches(value, [
-            "write", "make", "help", "explain", "summarize", "translate",
-            "english", "this", "short", "long", "reply", "answer",
-            "in english", "can you", "i want", "thank", "praise"
-        ]);
-
-        var norwegianHits = countMatches(value, [
-            "skriv", "gjør", "hjelp", "forklar", "oppsummer",
-            "norsk", "dette", "kort", "svar", "på norsk"
-        ]);
-
-        var danishHits = countMatches(value, [
-            "skriv", "gør", "hjælp", "forklar", "opsummer",
-            "dansk", "dette", "kort", "svar", "på dansk"
-        ]);
-
-        var finnishHits = countMatches(value, [
-            "kirjoita", "tee", "auta", "selitä", "tiivistä",
-            "suomi", "suomeksi", "tämä", "lyhyt", "vastaa"
-        ]);
-
-        var germanHits = countMatches(value, [
-            "schreib", "schreibe", "mach", "hilfe", "erkläre",
-            "deutsch", "kurz", "antwort", "auf deutsch"
-        ]);
-
-        var frenchHits = countMatches(value, [
-            "écris", "ecris", "aide", "explique", "résume", "resume",
-            "français", "francais", "réponds", "reponds"
-        ]);
-
-        var spanishHits = countMatches(value, [
-            "escribe", "haz", "ayuda", "explica", "resume",
-            "español", "espanol", "responde"
-        ]);
-
-        var scores = [
-            { language: "sv", score: swedishHits },
-            { language: "en", score: englishHits },
-            { language: "no", score: norwegianHits },
-            { language: "da", score: danishHits },
-            { language: "fi", score: finnishHits },
-            { language: "de", score: germanHits },
-            { language: "fr", score: frenchHits },
-            { language: "es", score: spanishHits }
-        ];
-
-        scores.sort(function (a, b) {
-            return b.score - a.score;
-        });
-
-        if (scores[0].score > 0) {
-            return scores[0].language;
-        }
-
-        return "sv";
-    }
-
-    function countMatches(text, words) {
-        var count = 0;
-
-        for (var i = 0; i < words.length; i++) {
-            if (text.indexOf(words[i]) !== -1) {
-                count++;
-            }
-        }
-
-        return count;
-    }
-
-    function getCkEditorInstance() {
-        if (typeof window.CKEDITOR === "undefined" || !window.CKEDITOR.instances) {
-            return null;
-        }
-
-        var names = Object.keys(window.CKEDITOR.instances);
-
-        if (!names.length) {
-            return null;
-        }
-
-        return window.CKEDITOR.instances[names[0]];
-    }
-
-    function getEditorText() {
-        var ckeditor = getCkEditorInstance();
-
-        if (ckeditor) {
-            return stripHtml(ckeditor.getData());
-        }
-
-        var textarea = document.querySelector("textarea[name='text'], textarea[name='pagetext'], textarea");
-
-        if (textarea) {
-            return textarea.value || "";
-        }
-
-        var editable = document.querySelector("[contenteditable='true']");
-
-        if (editable) {
-            return editable.innerText || editable.textContent || "";
-        }
-
-        return "";
-    }
-
-    function getBreadcrumbText() {
-        var selectors = [
-            ".breadcrumbs",
-            ".breadcrumb",
-            ".b-breadcrumb",
-            ".js-breadcrumbs",
-            "nav[aria-label='breadcrumb']"
-        ];
-
-        for (var i = 0; i < selectors.length; i++) {
-            var element = document.querySelector(selectors[i]);
-
-            if (element) {
-                var text = cleanText(element.innerText || element.textContent || "");
-
-                if (text) {
-                    return text;
-                }
-            }
-        }
-
-        return "";
-    }
-
-    function getThreadContext() {
-        var posts = [];
-        var seen = {};
-        var postSelectors = [
-            ".js-post",
-            ".b-post",
-            ".postbit",
-            ".post",
-            ".conversation-content",
-            ".js-conversation-content",
-            ".b-comment",
-            ".comment",
-            ".message",
-            ".js-message",
-            ".topic-item",
-            ".b-topic",
-            ".js-topic"
-        ];
-
-        for (var i = 0; i < postSelectors.length; i++) {
-            var elements = document.querySelectorAll(postSelectors[i]);
-
-            for (var j = 0; j < elements.length; j++) {
-                var postText = extractPostText(elements[j]);
-
-                if (!postText) {
-                    continue;
-                }
-
-                if (seen[postText]) {
-                    continue;
-                }
-
-                seen[postText] = true;
-                posts.push(postText);
-
-                if (posts.length >= MAX_POSTS) {
-                    break;
-                }
-            }
-
-            if (posts.length >= MAX_POSTS) {
-                break;
-            }
-        }
-
-        if (!posts.length) {
-            return "";
-        }
-
-        return posts.map(function (post, index) {
-            return "Thread post " + (index + 1) + ":\n" + post;
-        }).join("\n\n");
-    }
-
-    function extractPostText(element) {
-        if (!element) {
-            return "";
-        }
-
-        var clone = element.cloneNode(true);
-
-        removeNoise(clone);
-
-        var author = extractAuthor(element);
-        var text = cleanText(clone.innerText || clone.textContent || "");
-
-        if (!text) {
-            return "";
-        }
-
-        if (text.length < 20) {
-            return "";
-        }
-
-        if (author) {
-            return "Author: " + author + "\n" + text;
-        }
-
-        return text;
-    }
-
-    function extractAuthor(element) {
-        var selectors = [
-            ".username",
-            ".author",
-            ".userinfo .name",
-            ".b-userinfo__username",
-            ".js-user-name",
-            "a[href*='/member/']",
-            "a[href*='member.php']"
-        ];
-
-        for (var i = 0; i < selectors.length; i++) {
-            var authorElement = element.querySelector(selectors[i]);
-
-            if (authorElement) {
-                var text = cleanText(authorElement.innerText || authorElement.textContent || "");
-
-                if (text) {
-                    return text;
-                }
-            }
-        }
-
-        return "";
-    }
-
-    function removeNoise(root) {
-        var noiseSelectors = [
-            "script",
-            "style",
-            "noscript",
-            ".signature",
-            ".sig",
-            ".post-signature",
-            ".b-post__signature",
-            ".js-post-signature",
-            ".quote-controls",
-            ".post-controls",
-            ".b-post-control",
-            ".js-post-menu",
-            ".reactions",
-            ".reaction",
-            ".attachments",
-            ".attachment",
-            ".avatar",
-            ".user-avatar",
-            ".js-avatar",
-            ".moderation",
-            ".admin-controls",
-            ".h-hide",
-            ".hidden",
-            "#vbulletinbytools-ai-panel",
-            "#vbulletinbytools-ai-button-row"
-        ];
-
-        for (var i = 0; i < noiseSelectors.length; i++) {
-            var elements = root.querySelectorAll(noiseSelectors[i]);
-
-            for (var j = 0; j < elements.length; j++) {
-                elements[j].remove();
-            }
-        }
-    }
-
     function cleanText(text) {
         return String(text || "")
             .replace(/\r/g, "\n")
@@ -422,38 +38,52 @@
         return text.substring(0, maxLength) + "\n\n[Context truncated]";
     }
 
-    function insertIntoEditor(text) {
-        var bbcode = markdownToBbcode(text);
-        var ckeditor = getCkEditorInstance();
+    function findEditorElement() {
+        var selectors = [
+            "textarea[name='text']",
+            "textarea[name='pagetext']",
+            "textarea",
+            "[contenteditable='true']",
+            ".cke_wysiwyg_frame",
+            ".js-editor",
+            ".cke",
+            ".editor",
+            ".conversation-editor"
+        ];
 
-        if (ckeditor) {
-            var current = ckeditor.getData() || "";
-            var currentText = stripHtml(current).trim();
-            var separator = currentText ? "\n\n" : "";
+        for (var i = 0; i < selectors.length; i++) {
+            var element = document.querySelector(selectors[i]);
 
-            ckeditor.setData(htmlParagraphs(currentText + separator + bbcode));
-            return true;
+            if (element) {
+                return element;
+            }
         }
 
-        var textarea = document.querySelector("textarea[name='text'], textarea[name='pagetext'], textarea");
+        return null;
+    }
 
-        if (textarea) {
-            var existing = textarea.value || "";
-            textarea.value = existing + (existing.trim() ? "\n\n" : "") + bbcode;
-            textarea.dispatchEvent(new Event("input", { bubbles: true }));
-            textarea.dispatchEvent(new Event("change", { bubbles: true }));
-            return true;
+    function findEditorContainer() {
+        var element = findEditorElement();
+
+        if (!element) {
+            return null;
         }
 
-        var editable = document.querySelector("[contenteditable='true']");
+        return element.closest(".editor, .cke, .js-post-editor, .conversation-editor, form") || element.parentNode;
+    }
 
-        if (editable) {
-            editable.innerText = (editable.innerText || "") + "\n\n" + bbcode;
-            editable.dispatchEvent(new Event("input", { bubbles: true }));
-            return true;
+    function getCkEditorInstance() {
+        if (typeof window.CKEDITOR === "undefined" || !window.CKEDITOR.instances) {
+            return null;
         }
 
-        return false;
+        var names = Object.keys(window.CKEDITOR.instances);
+
+        if (!names.length) {
+            return null;
+        }
+
+        return window.CKEDITOR.instances[names[0]];
     }
 
     function stripHtml(html) {
@@ -479,46 +109,180 @@
         }).join("");
     }
 
-    function markdownToBbcode(markdown) {
-        var text = String(markdown || "").replace(/\r\n/g, "\n").replace(/\r/g, "\n");
-        var codeBlocks = [];
+    function getEditorText() {
+        var ckeditor = getCkEditorInstance();
 
-        text = text.replace(/```([a-z0-9_-]+)?\n([\s\S]*?)```/gi, function (match, language, code) {
-            var token = "@@VBT_CODE_BLOCK_" + codeBlocks.length + "@@";
-            codeBlocks.push("[code]" + trimCodeBlock(code) + "[/code]");
-            return token;
-        });
-
-        text = text.replace(/!\[([^\]]*)\]\(([^\s)]+)(?:\s+\"[^\"]*\")?\)/g, function (match, alt, url) {
-            return "[img]" + url + "[/img]";
-        });
-
-        text = text.replace(/\[([^\]]+)\]\(([^\s)]+)(?:\s+\"[^\"]*\")?\)/g, function (match, label, url) {
-            return "[url=" + url + "]" + label + "[/url]";
-        });
-
-        text = text.replace(/^######\s+(.+)$/gm, "[b]$1[/b]");
-        text = text.replace(/^#####\s+(.+)$/gm, "[b]$1[/b]");
-        text = text.replace(/^####\s+(.+)$/gm, "[b]$1[/b]");
-        text = text.replace(/^###\s+(.+)$/gm, "[b]$1[/b]");
-        text = text.replace(/^##\s+(.+)$/gm, "[b]$1[/b]");
-        text = text.replace(/^#\s+(.+)$/gm, "[b]$1[/b]");
-
-        text = text.replace(/^>\s?(.+)$/gm, "[quote]$1[/quote]");
-        text = convertMarkdownListsToBbcode(text);
-
-        text = text.replace(/\*\*([^*\n][\s\S]*?[^*\n])\*\*/g, "[b]$1[/b]");
-        text = text.replace(/__([^_\n][\s\S]*?[^_\n])__/g, "[b]$1[/b]");
-        text = text.replace(/(^|[^*])\*([^*\n]+)\*(?!\*)/g, "$1[i]$2[/i]");
-        text = text.replace(/(^|[^_])_([^_\n]+)_(?!_)/g, "$1[i]$2[/i]");
-        text = text.replace(/`([^`\n]+)`/g, "[icode]$1[/icode]");
-        text = text.replace(/^\s*---\s*$/gm, "");
-
-        for (var i = 0; i < codeBlocks.length; i++) {
-            text = text.replace("@@VBT_CODE_BLOCK_" + i + "@@", codeBlocks[i]);
+        if (ckeditor) {
+            return stripHtml(ckeditor.getData());
         }
 
-        return text.replace(/\n{3,}/g, "\n\n").trim();
+        var textarea = document.querySelector("textarea[name='text'], textarea[name='pagetext'], textarea");
+
+        if (textarea) {
+            return textarea.value || "";
+        }
+
+        var editable = document.querySelector("[contenteditable='true']");
+
+        if (editable) {
+            return editable.innerText || editable.textContent || "";
+        }
+
+        return "";
+    }
+
+    function getTitleText() {
+        var titleInput = document.querySelector("input[name='title'], input[name='subject'], input[placeholder='Enter title']");
+
+        if (titleInput && titleInput.value) {
+            return titleInput.value;
+        }
+
+        var titleElement = document.querySelector("h1, .b-page-title, .conversation-title, .thread-title, .topic-title, .js-topic-title");
+
+        if (titleElement) {
+            return cleanText(titleElement.innerText || titleElement.textContent || "");
+        }
+
+        return document.title || "";
+    }
+
+    function getBreadcrumbText() {
+        var element = document.querySelector(".breadcrumbs, .breadcrumb, .b-breadcrumb, .js-breadcrumbs, nav[aria-label='breadcrumb']");
+
+        if (!element) {
+            return "";
+        }
+
+        return cleanText(element.innerText || element.textContent || "");
+    }
+
+    function getCurrentNodeId() {
+        if (window.pageData) {
+            var keys = ["nodeid", "nodeId", "conversationid", "conversationId", "parentid", "parentId", "starter", "starterid", "starterId"];
+
+            for (var i = 0; i < keys.length; i++) {
+                if (window.pageData[keys[i]]) {
+                    return parseInt(window.pageData[keys[i]], 10) || 0;
+                }
+            }
+        }
+
+        var nodeElement = document.querySelector("[data-node-id], [data-nodeid], [data-node-id32], [data-node]");
+
+        if (nodeElement) {
+            return parseInt(
+                nodeElement.getAttribute("data-node-id") ||
+                nodeElement.getAttribute("data-nodeid") ||
+                nodeElement.getAttribute("data-node-id32") ||
+                nodeElement.getAttribute("data-node"),
+                10
+            ) || 0;
+        }
+
+        var urlMatch = String(window.location.href || "").match(/(?:nodeid|node|p|t|topic)[=\/](\d+)/i);
+
+        if (urlMatch && urlMatch[1]) {
+            return parseInt(urlMatch[1], 10) || 0;
+        }
+
+        return 0;
+    }
+
+    function getSecurityToken() {
+        var candidates = [];
+
+        if (window.SECURITYTOKEN) {
+            candidates.push(window.SECURITYTOKEN);
+        }
+
+        if (window.securitytoken) {
+            candidates.push(window.securitytoken);
+        }
+
+        if (window.pageData) {
+            candidates.push(window.pageData.securitytoken);
+            candidates.push(window.pageData.securityToken);
+            candidates.push(window.pageData.SECURITYTOKEN);
+        }
+
+        if (window.vBulletin) {
+            candidates.push(window.vBulletin.securitytoken);
+            candidates.push(window.vBulletin.securityToken);
+
+            if (typeof window.vBulletin.getSecurityToken === "function") {
+                candidates.push(window.vBulletin.getSecurityToken());
+            }
+        }
+
+        var input = document.querySelector("input[name='securitytoken'], input[name='securityToken'], input[name='token']");
+
+        if (input && input.value) {
+            candidates.push(input.value);
+        }
+
+        var meta = document.querySelector("meta[name='securitytoken'], meta[name='securityToken'], meta[name='csrf-token']");
+
+        if (meta && meta.getAttribute("content")) {
+            candidates.push(meta.getAttribute("content"));
+        }
+
+        for (var i = 0; i < candidates.length; i++) {
+            var value = String(candidates[i] || "").trim();
+
+            if (value && value !== "undefined" && value !== "null") {
+                return value;
+            }
+        }
+
+        return "";
+    }
+
+    function detectInstructionLanguage(text) {
+        var value = String(text || "").toLowerCase();
+
+        if (value.indexOf(" in english") !== -1 || value.indexOf("på engelska") !== -1) {
+            return "en";
+        }
+
+        if (value.indexOf("på svenska") !== -1 || value.indexOf(" skriv") !== -1 || value.indexOf("kan du") !== -1) {
+            return "sv";
+        }
+
+        var htmlLang = String(document.documentElement.getAttribute("lang") || "").toLowerCase();
+
+        if (htmlLang.indexOf("sv") === 0) {
+            return "sv";
+        }
+
+        if (htmlLang.indexOf("en") === 0) {
+            return "en";
+        }
+
+        return "sv";
+    }
+
+    function getThreadContext() {
+        var posts = [];
+        var seen = {};
+        var elements = document.querySelectorAll(".js-post, .b-post, .postbit, .post, .conversation-content, .js-conversation-content, .b-comment, .comment, .message, .js-message, .topic-item, .b-topic, .js-topic");
+
+        for (var i = 0; i < elements.length; i++) {
+            var text = cleanText(elements[i].innerText || elements[i].textContent || "");
+
+            if (!text || text.length < 20 || seen[text]) {
+                continue;
+            }
+
+            seen[text] = true;
+            posts.push("Thread post " + (posts.length + 1) + ":\n" + text);
+
+            if (posts.length >= MAX_POSTS) {
+                break;
+            }
+        }
+
+        return posts.join("\n\n");
     }
 
     function trimCodeBlock(code) {
@@ -569,8 +333,42 @@
         }
 
         closeList();
-
         return output.join("\n");
+    }
+
+    function markdownToBbcode(markdown) {
+        var text = String(markdown || "").replace(/\r\n/g, "\n").replace(/\r/g, "\n");
+        var codeBlocks = [];
+
+        text = text.replace(/```([a-z0-9_-]+)?\n([\s\S]*?)```/gi, function (match, language, code) {
+            var token = "@@VBT_CODE_BLOCK_" + codeBlocks.length + "@@";
+            codeBlocks.push("[code]" + trimCodeBlock(code) + "[/code]");
+            return token;
+        });
+
+        text = text.replace(/!\[([^\]]*)\]\(([^\s)]+)(?:\s+\"[^\"]*\")?\)/g, function (match, alt, url) {
+            return "[img]" + url + "[/img]";
+        });
+
+        text = text.replace(/\[([^\]]+)\]\(([^\s)]+)(?:\s+\"[^\"]*\")?\)/g, function (match, label, url) {
+            return "[url=" + url + "]" + label + "[/url]";
+        });
+
+        text = text.replace(/^#{1,6}\s+(.+)$/gm, "[b]$1[/b]");
+        text = text.replace(/^>\s?(.+)$/gm, "[quote]$1[/quote]");
+        text = convertMarkdownListsToBbcode(text);
+        text = text.replace(/\*\*([^*\n][\s\S]*?[^*\n])\*\*/g, "[b]$1[/b]");
+        text = text.replace(/__([^_\n][\s\S]*?[^_\n])__/g, "[b]$1[/b]");
+        text = text.replace(/(^|[^*])\*([^*\n]+)\*(?!\*)/g, "$1[i]$2[/i]");
+        text = text.replace(/(^|[^_])_([^_\n]+)_(?!_)/g, "$1[i]$2[/i]");
+        text = text.replace(/`([^`\n]+)`/g, "[icode]$1[/icode]");
+        text = text.replace(/^\s*---\s*$/gm, "");
+
+        for (var i = 0; i < codeBlocks.length; i++) {
+            text = text.replace("@@VBT_CODE_BLOCK_" + i + "@@", codeBlocks[i]);
+        }
+
+        return text.replace(/\n{3,}/g, "\n\n").trim();
     }
 
     function extractAiText(response) {
@@ -598,10 +396,6 @@
             return response.response.text;
         }
 
-        if (response.response && typeof response.response.raw_preview === "string") {
-            return "Servern fick ett ogiltigt svar från Tornevall Tools:\n\n" + response.response.raw_preview;
-        }
-
         if (typeof response.response === "string") {
             return response.response;
         }
@@ -616,10 +410,6 @@
 
         if (response.raw_preview) {
             return response.raw_preview;
-        }
-
-        if (response.raw) {
-            return response.raw;
         }
 
         return JSON.stringify(response, null, 2);
@@ -653,6 +443,39 @@
         return JSON.stringify(error, null, 2);
     }
 
+    function insertIntoEditor(text) {
+        var bbcode = markdownToBbcode(text);
+        var ckeditor = getCkEditorInstance();
+
+        if (ckeditor) {
+            var current = ckeditor.getData() || "";
+            var currentText = stripHtml(current).trim();
+            var separator = currentText ? "\n\n" : "";
+            ckeditor.setData(htmlParagraphs(currentText + separator + bbcode));
+            return true;
+        }
+
+        var textarea = document.querySelector("textarea[name='text'], textarea[name='pagetext'], textarea");
+
+        if (textarea) {
+            var existing = textarea.value || "";
+            textarea.value = existing + (existing.trim() ? "\n\n" : "") + bbcode;
+            textarea.dispatchEvent(new Event("input", { bubbles: true }));
+            textarea.dispatchEvent(new Event("change", { bubbles: true }));
+            return true;
+        }
+
+        var editable = document.querySelector("[contenteditable='true']");
+
+        if (editable) {
+            editable.innerText = (editable.innerText || "") + "\n\n" + bbcode;
+            editable.dispatchEvent(new Event("input", { bubbles: true }));
+            return true;
+        }
+
+        return false;
+    }
+
     function callAi(promptText) {
         var title = getTitleText();
         var breadcrumbs = getBreadcrumbText();
@@ -660,6 +483,7 @@
         var editorText = getEditorText();
         var language = detectInstructionLanguage(promptText);
         var nodeid = getCurrentNodeId();
+        var securitytoken = getSecurityToken();
 
         var context = [
             "Page: vBulletin editor",
@@ -686,6 +510,17 @@
             promptText
         ].join("\n");
 
+        var body = new URLSearchParams({
+            context: context,
+            prompt: finalPrompt,
+            language: language,
+            nodeid: nodeid
+        });
+
+        if (securitytoken) {
+            body.append("securitytoken", securitytoken);
+        }
+
         return fetch(API_CALL, {
             method: "POST",
             headers: {
@@ -694,12 +529,7 @@
                 "X-Requested-With": "XMLHttpRequest"
             },
             credentials: "same-origin",
-            body: new URLSearchParams({
-                context: context,
-                prompt: finalPrompt,
-                language: language,
-                nodeid: nodeid
-            }).toString()
+            body: body.toString()
         })
             .then(function (response) {
                 return response.text().then(function (rawText) {
@@ -739,10 +569,9 @@
         var panel = document.createElement("div");
         panel.id = PANEL_ID;
         panel.className = "vbulletinbytools-ai-panel";
-
         panel.innerHTML = [
             "<div class='vbulletinbytools-ai-panel-title'>Ask AI for help</div>",
-            "<textarea class='vbulletinbytools-ai-prompt' placeholder='Vad vill du ha hjälp med? Ex: Skriv om detta mer sakligt, korta ner texten, skapa ett svar på tråden...'></textarea>",
+            "<textarea class='vbulletinbytools-ai-prompt' placeholder='Vad vill du ha hjälp med? Ex: skriv om, sammanfatta, skapa ett svar på tråden...'></textarea>",
             "<div class='vbulletinbytools-ai-actions'>",
             "  <button type='button' class='vbulletinbytools-ai-send'>Ask AI</button>",
             "  <button type='button' class='vbulletinbytools-ai-close'>Close</button>",
@@ -794,14 +623,7 @@
             }
 
             send.disabled = true;
-            result.innerHTML = [
-                "<div class='vbulletinbytools-ai-loading'>",
-                "  <div class='vbulletinbytools-ai-loading-text'>Tänker...</div>",
-                "  <div class='vbulletinbytools-ai-progress'>",
-                "    <div class='vbulletinbytools-ai-progress-bar'></div>",
-                "  </div>",
-                "</div>"
-            ].join("");
+            result.innerHTML = "<div class='vbulletinbytools-ai-loading'><div class='vbulletinbytools-ai-loading-text'>Tänker...</div><div class='vbulletinbytools-ai-progress'><div class='vbulletinbytools-ai-progress-bar'></div></div></div>";
             resultActions.classList.add("h-hide");
 
             callAi(promptText)
@@ -838,7 +660,7 @@
 
         var editorContainer = findEditorContainer();
 
-        if (!editorContainer) {
+        if (!editorContainer || !editorContainer.parentNode) {
             return;
         }
 
@@ -851,13 +673,9 @@
         button.type = "button";
         button.className = "vbulletinbytools-ai-button";
         button.textContent = "Ask AI for help";
-
-        button.addEventListener("click", function () {
-            createPanel();
-        });
+        button.addEventListener("click", createPanel);
 
         buttonRow.appendChild(button);
-
         editorContainer.parentNode.insertBefore(buttonRow, editorContainer);
     }
 
