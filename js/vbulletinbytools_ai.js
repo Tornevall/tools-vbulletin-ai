@@ -578,6 +578,14 @@
             return "";
         }
 
+        if (response.gateway_ok === false && typeof response.text === "string") {
+            return response.text;
+        }
+
+        if (response.response && response.response.gateway_ok === false && typeof response.response.text === "string") {
+            return response.response.text;
+        }
+
         if (response.response && typeof response.response.response === "string") {
             return response.response.response;
         }
@@ -617,6 +625,30 @@
         return JSON.stringify(response, null, 2);
     }
 
+    function formatAjaxError(error) {
+        if (!error) {
+            return "Unknown error.";
+        }
+
+        if (typeof error === "string") {
+            return error;
+        }
+
+        if (error.text) {
+            return error.text;
+        }
+
+        if (error.raw_preview) {
+            return error.raw_preview;
+        }
+
+        if (error.responseText) {
+            return error.responseText;
+        }
+
+        return JSON.stringify(error, null, 2);
+    }
+
     function callAi(promptText) {
         var title = getTitleText();
         var breadcrumbs = getBreadcrumbText();
@@ -650,49 +682,45 @@
             promptText
         ].join("\n");
 
-        return new Promise(function (resolve, reject) {
-            if (window.vBulletin && typeof window.vBulletin.AJAX === "function") {
-                window.vBulletin.AJAX({
-                    call: API_CALL,
-                    data: {
-                        context: context,
-                        prompt: finalPrompt,
-                        language: language,
-                        nodeid: nodeid
-                    },
-                    success: function (response) {
-                        resolve(response);
-                    },
-                    api_error: function (error) {
-                        reject(error);
-                    },
-                    error: function (error) {
-                        reject(error);
+        return fetch(API_CALL, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/x-www-form-urlencoded",
+                "Accept": "application/json"
+            },
+            credentials: "same-origin",
+            body: new URLSearchParams({
+                context: context,
+                prompt: finalPrompt,
+                language: language,
+                nodeid: nodeid
+            }).toString()
+        })
+            .then(function (response) {
+                return response.text().then(function (rawText) {
+                    var parsed = null;
+
+                    try {
+                        parsed = rawText ? JSON.parse(rawText) : null;
+                    } catch (e) {
+                        throw {
+                            message: "Invalid JSON response from vBulletin endpoint.",
+                            status: response.status,
+                            raw_preview: rawText.substring(0, 2000)
+                        };
                     }
+
+                    if (!response.ok) {
+                        throw parsed || {
+                            message: "HTTP error from vBulletin endpoint.",
+                            status: response.status,
+                            raw_preview: rawText.substring(0, 2000)
+                        };
+                    }
+
+                    return parsed;
                 });
-
-                return;
-            }
-
-            fetch(API_CALL, {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/x-www-form-urlencoded"
-                },
-                credentials: "same-origin",
-                body: new URLSearchParams({
-                    context: context,
-                    prompt: finalPrompt,
-                    language: language,
-                    nodeid: nodeid
-                }).toString()
-            })
-                .then(function (response) {
-                    return response.json();
-                })
-                .then(resolve)
-                .catch(reject);
-        });
+            });
     }
 
     function createPanel() {
@@ -778,7 +806,7 @@
                     resultActions.classList.remove("h-hide");
                 })
                 .catch(function (error) {
-                    result.textContent = "AI-anropet misslyckades:\n" + JSON.stringify(error, null, 2);
+                    result.textContent = "AI-anropet misslyckades:\n" + formatAjaxError(error);
                 })
                 .finally(function () {
                     send.disabled = false;
