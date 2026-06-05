@@ -166,10 +166,22 @@ class vbulletinbytools_Api_Ai extends vB_Api
             $context = trim($context . "\n\nServer-side vBulletin thread context:\n" . $threadContext);
         }
 
+        $sourceSensitiveRequest = $this->isSourceSensitiveRequest($prompt . "\n" . $context);
+
+        if ($sourceSensitiveRequest) {
+            $context = trim($context . "\n\nSource verification rules:\n" . implode("\n", array(
+                '- This request asks for sources, references, citations, links, fact checking or verifiable factual claims.',
+                '- Use web search to verify source URLs and citation targets before presenting them.',
+                '- Do not invent sources, citation labels, article titles or URLs.',
+                '- If no verified source is found, say that no verified source was found instead of creating a broken reference.',
+                '- Prefer direct, canonical, reachable source URLs when sources are requested.',
+            )));
+        }
+
         $fullContext = $this->buildFullContext($context, $persona, $personaFieldId, $userid, $username);
 
-        $useWebSearch = !empty($options['tornis_tools_ai_web_search_enabled']);
-        $webSearchRequired = !empty($options['tornis_tools_ai_web_search_required']);
+        $useWebSearch = !empty($options['tornis_tools_ai_web_search_enabled']) || $sourceSensitiveRequest;
+        $webSearchRequired = !empty($options['tornis_tools_ai_web_search_required']) || $sourceSensitiveRequest;
 
         require_once(DIR . '/packages/vbulletinbytools/library/TornevallTools/OpenAiClient.php');
 
@@ -200,6 +212,9 @@ class vbulletinbytools_Api_Ai extends vB_Api
                 'persona_field_id' => $personaFieldId,
                 'persona_field_name' => ($personaFieldId > 0 ? 'field' . $personaFieldId : ''),
                 'has_persona' => ($persona !== ''),
+                'source_sensitive_request' => $sourceSensitiveRequest,
+                'use_web_search' => $useWebSearch,
+                'web_search_required' => $webSearchRequired,
             ),
         ));
     }
@@ -253,6 +268,56 @@ class vbulletinbytools_Api_Ai extends vB_Api
             'Forum/editor context:',
             $context,
         ));
+    }
+
+    private function isSourceSensitiveRequest($text)
+    {
+        $text = mb_strtolower((string) $text, 'UTF-8');
+
+        $needles = array(
+            'källa',
+            'källor',
+            'källhänvisning',
+            'källhänvisningar',
+            'referens',
+            'referenser',
+            'citat',
+            'citera',
+            'länk',
+            'länkar',
+            'url',
+            'artikel',
+            'artiklar',
+            'fakta',
+            'faktakoll',
+            'verifiera',
+            'bekräfta',
+            'belägg',
+            'source',
+            'sources',
+            'citation',
+            'citations',
+            'reference',
+            'references',
+            'link',
+            'links',
+            'url',
+            'article',
+            'articles',
+            'fact check',
+            'fact-check',
+            'verify',
+            'verified',
+            'evidence',
+        );
+
+        foreach ($needles as $needle) {
+            if (strpos($text, $needle) !== false) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private function apiSafeError($prefix, Throwable $e)
