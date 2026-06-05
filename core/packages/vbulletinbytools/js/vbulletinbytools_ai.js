@@ -2,7 +2,7 @@
     "use strict";
 
     var scriptId = "vbulletinbytools-ai-root-loader";
-    var target = "/js/vbulletinbytools_ai.js?v=15";
+    var target = "/js/vbulletinbytools_ai.js?v=17";
 
     if (document.getElementById(scriptId)) {
         return;
