@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<navgroups>
+    <navgroup phrase="vbulletin_by_tools" displayorder="900">
+        <navoption phrase="settings" link="options.php?do=options&amp;dogroup=vbulletin_by_tools" displayorder="10" />
+    </navgroup>
+</navgroups>

@@ -1,0 +1,115 @@
+#vbulletinbytools-ai-button,
+.vbulletinbytools-ai-button {
+    margin-left: 8px;
+    padding: 7px 12px;
+    border: 1px solid #7b8d7a;
+    background: #f7faf4;
+    color: #314c37;
+    cursor: pointer;
+    font-weight: 700;
+    border-radius: 2px;
+}
+
+#vbulletinbytools-ai-button:hover,
+.vbulletinbytools-ai-button:hover {
+    background: #eef5ea;
+}
+
+.vbulletinbytools-ai-button-row {
+    margin: 10px 0 6px 0;
+    text-align: left;
+}
+
+.vbulletinbytools-ai-panel {
+    margin: 12px 0;
+    padding: 12px;
+    border: 1px solid #9aa99a;
+    background: #f6faf3;
+}
+
+.vbulletinbytools-ai-panel-title {
+    font-weight: 700;
+    margin-bottom: 8px;
+}
+
+.vbulletinbytools-ai-prompt {
+    width: 100%;
+    min-height: 90px;
+    box-sizing: border-box;
+    margin-bottom: 8px;
+}
+
+.vbulletinbytools-ai-actions {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 8px;
+}
+
+.vbulletinbytools-ai-actions button {
+    padding: 6px 12px;
+    cursor: pointer;
+}
+
+.vbulletinbytools-ai-result {
+    white-space: pre-wrap;
+    background: #ffffff;
+    border: 1px solid #ccd5cc;
+    padding: 10px;
+    max-height: 360px;
+    overflow: auto;
+    box-sizing: border-box;
+}
+
+.vbulletinbytools-ai-result-actions.h-hide,
+.h-hide {
+    display: none;
+}
+
+.vbulletinbytools-ai-loading {
+    padding: 8px 0 4px 0;
+}
+
+.vbulletinbytools-ai-loading-text {
+    margin-bottom: 10px;
+    font-weight: 700;
+}
+
+.vbulletinbytools-ai-progress {
+    position: relative;
+    width: 100%;
+    height: 22px;
+    overflow: hidden;
+    border: 1px solid #7b8d7a;
+    background: #edf4ea;
+    box-sizing: border-box;
+}
+
+.vbulletinbytools-ai-progress::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: -45%;
+    width: 45%;
+    height: 100%;
+    background: linear-gradient(
+        90deg,
+        rgba(111, 143, 115, 0.15) 0%,
+        rgba(111, 143, 115, 0.85) 50%,
+        rgba(111, 143, 115, 0.15) 100%
+    );
+    animation: vbulletinbytools-ai-progress-slide 1s linear infinite;
+}
+
+.vbulletinbytools-ai-progress-bar {
+    display: none;
+}
+
+@keyframes vbulletinbytools-ai-progress-slide {
+    0% {
+        left: -45%;
+    }
+
+    100% {
+        left: 100%;
+    }
+}

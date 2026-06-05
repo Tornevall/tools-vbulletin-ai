@@ -1,0 +1,20 @@
+Install
+=======
+
+Copy the folder:
+core/packages/vbulletin_by_tools
+
+to:
+/YOUR_FORUM_ROOT/core/packages/vbulletin_by_tools
+
+Do not copy api/ai.php to the forum root.
+
+This is a vBulletin 6 package-style starter and follows the same rough layout as packages like googlelogin and wordpresslogin.
+
+After upload, verify:
+- /core/packages/vbulletin_by_tools/product.php exists
+- /core/packages/vbulletin_by_tools/hooks.php exists
+- /core/packages/vbulletin_by_tools/api/ai.php exists
+- /core/packages/vbulletin_by_tools/js/tornis_tools_ai.js exists
+
+Then connect/register the product in AdminCP according to your vBulletin install flow.

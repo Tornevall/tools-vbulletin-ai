@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<product productid="vbulletinbytools" active="1">
+<title>VBulletin by Tornevall Tools</title>
+<description>Tornevall Tools integration for vBulletin, including AI-assisted editor tools through the vBulletin API system.</description>
+<version>1.0.0</version>
+<url>https://tools.tornevall.net</url>
+<versioncheckurl></versioncheckurl>
+
+<dependencies>
+<dependency dependencytype="vbulletin" minversion="6.0.0" maxversion="" />
+<dependency dependencytype="php" minversion="7.4.0" maxversion="" />
+</dependencies>
+
+<codes>
+<code version="1.0.0">
+<installcode><![CDATA[
+/*
+ * No install code required.
+ */
+]]></installcode>
+<uninstallcode><![CDATA[
+/*
+ * No uninstall code required.
+ */
+]]></uninstallcode>
+</code>
+</codes>
+
+<templates>
+</templates>
+
+<plugins>
+</plugins>
+
+<phrases>
+<phrasetype name="Global" fieldname="global">
+<phrase name="vbulletinbytools" date="1780649500" username="Tornevall" version="1.0.0"><![CDATA[VBulletin by Tornevall Tools]]></phrase>
+<phrase name="vbulletinbytools_settings" date="1780649500" username="Tornevall" version="1.0.0"><![CDATA[Settings]]></phrase>
+</phrasetype>
+</phrases>
+
+<options>
+</options>
+</product>

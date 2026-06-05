@@ -1,0 +1,21 @@
+.tornis-tools-ai-panel {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    margin: 8px 0;
+    padding: 8px;
+    border: 1px solid #b7c4b0;
+    background: #eef5ea;
+}
+
+.tornis-tools-ai-panel button {
+    cursor: pointer;
+    padding: 6px 10px;
+    border: 1px solid #8ca085;
+    background: #ffffff;
+}
+
+.tornis-tools-ai-status {
+    margin-left: 8px;
+    font-size: 12px;
+}
