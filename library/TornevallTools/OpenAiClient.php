@@ -44,7 +44,7 @@ class TornevallTools_OpenAiClient
             CURLOPT_POST => true,
             CURLOPT_RETURNTRANSFER => true,
             CURLOPT_CONNECTTIMEOUT => 10,
-            CURLOPT_TIMEOUT => 60,
+            CURLOPT_TIMEOUT => 90,
             CURLOPT_HTTPHEADER => array(
                 'Content-Type: application/json',
                 'Accept: application/json',
@@ -56,6 +56,7 @@ class TornevallTools_OpenAiClient
         $rawResponse = curl_exec($ch);
         $curlError = curl_error($ch);
         $httpCode = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $contentType = (string) curl_getinfo($ch, CURLINFO_CONTENT_TYPE);
 
         curl_close($ch);
 
@@ -63,17 +64,28 @@ class TornevallTools_OpenAiClient
             return array(
                 'ok' => false,
                 'error' => 'Curl error: ' . $curlError,
+                'request_bytes' => strlen($jsonPayload),
             );
         }
 
         $decoded = json_decode($rawResponse, true);
 
         if (!is_array($decoded)) {
+            $rawPreview = substr((string) $rawResponse, 0, 2000);
+
+            error_log('Tornevall Tools invalid JSON HTTP status: ' . $httpCode);
+            error_log('Tornevall Tools invalid JSON content-type: ' . $contentType);
+            error_log('Tornevall Tools request bytes: ' . strlen($jsonPayload));
+            error_log('Tornevall Tools invalid JSON raw preview: ' . $rawPreview);
+
             return array(
                 'ok' => false,
                 'status' => $httpCode,
+                'content_type' => $contentType,
+                'request_bytes' => strlen($jsonPayload),
+                'response_bytes' => strlen((string) $rawResponse),
                 'error' => 'Invalid JSON response from Tornevall Tools.',
-                'raw' => $rawResponse,
+                'raw_preview' => $rawPreview,
             );
         }
 
@@ -81,6 +93,7 @@ class TornevallTools_OpenAiClient
             return array(
                 'ok' => false,
                 'status' => $httpCode,
+                'request_bytes' => strlen($jsonPayload),
                 'error' => $decoded['error'] ?? 'Tornevall Tools returned HTTP ' . $httpCode,
                 'response' => $decoded,
             );
@@ -89,6 +102,7 @@ class TornevallTools_OpenAiClient
         return array(
             'ok' => true,
             'status' => $httpCode,
+            'request_bytes' => strlen($jsonPayload),
             'response' => $decoded,
         );
     }
