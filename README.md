@@ -4,6 +4,54 @@ AI assistant integration for vBulletin 6.
 
 This package adds an "Ask AI for help" helper near the vBulletin editor. The browser never talks directly to OpenAI or Tornevall Tools. All AI requests go through a server-side vBulletin API class, which reads the private API token from vBulletin options and forwards the request to Tornevall Tools.
 
+## Required external service
+
+This integration requires Tornevall Tools:
+
+```text
+https://tools.tornevall.net
+```
+
+The vBulletin package does not contain its own OpenAI key handling and does not call OpenAI directly from the browser. It uses Tornevall Tools as the AI gateway.
+
+You must create an API/bearer token in Tornevall Tools before the vBulletin integration can work. That token is then stored in vBulletin AdminCP as:
+
+```text
+tornis_tools_gpt_secret
+```
+
+The token must be the raw token value only. Do not include the `Bearer ` prefix.
+
+Correct:
+
+```text
+eyJ...
+```
+
+Wrong:
+
+```text
+Bearer eyJ...
+```
+
+The default Tornevall Tools base URL is:
+
+```text
+https://tools.tornevall.net
+```
+
+and should normally be stored in:
+
+```text
+tornis_tools_api_base_url
+```
+
+The API route used by the PHP client is:
+
+```text
+/api/ai/internal/respond
+```
+
 ## Current status
 
 Working parts:
@@ -14,9 +62,11 @@ Working parts:
 - Editor helper button
 - AI response panel
 - Insert answer into editor
+- Markdown-to-BBCode conversion before insert
 - vBulletin profile-field persona support
-- Optional external web search support
+- Optional external web search support through Tornevall Tools
 - Thread/context support through visible frontend context and backend node context
+- Gateway diagnostics for invalid upstream responses
 
 ## Package name
 
@@ -122,19 +172,7 @@ The secret setting:
 tornis_tools_gpt_secret
 ```
 
-must contain only the bearer token value, without the `Bearer ` prefix.
-
-Correct:
-
-```text
-eyJ...
-```
-
-Wrong:
-
-```text
-Bearer eyJ...
-```
+must contain the bearer token created in Tornevall Tools, without the `Bearer ` prefix.
 
 Never expose this token in JavaScript, templates, HTML, screenshots, logs or public XML exports.
 
@@ -194,7 +232,7 @@ Expected result when persona works:
 
 ## Thread context
 
-The frontend sends the current `nodeid` when it can find one through `pageData` or DOM data attributes.
+The frontend sends the current `nodeid` when it can find one through `pageData`, DOM data attributes or URL hints.
 
 The backend then tries to fetch thread context directly from vBulletin using:
 
@@ -213,6 +251,37 @@ The browser-side visible context is still sent as a fallback and supplement:
 
 Server-side thread context should be considered the primary thread source when `nodeid` is available.
 
+Debug route:
+
+```text
+/ajax/api/vbulletinbytools:Ai/threadDebug
+```
+
+Run from a thread page:
+
+```js
+vBulletin.AJAX({
+    call: "/ajax/api/vbulletinbytools:Ai/threadDebug",
+    data: {
+        nodeid: pageData.nodeid
+    },
+    success: function (response) {
+        console.log(response);
+    }
+});
+```
+
+Expected result when server-side thread context works:
+
+```json
+{
+  "ok": true,
+  "nodeid": 123,
+  "has_thread_context": true,
+  "thread_context_length": 1000
+}
+```
+
 ## Web search
 
 External web search can be enabled with:
@@ -229,7 +298,23 @@ tornis_tools_ai_web_search_required = 0
 
 That allows external web search when useful, but does not force it for every request.
 
-Thread content should not be fetched through web search. The forum already has the data locally. The backend should read thread posts/comments from vBulletin and pass them as context.
+Thread content should not be fetched through web search. The forum already has the data locally. The backend should read thread posts/comments from vBulletin and pass them as context. Web search should be used for external context, fact checking and references outside the forum.
+
+## Markdown and BBCode
+
+AI output may contain Markdown. Before inserting the answer into the vBulletin editor, the frontend converts common Markdown to BBCode.
+
+Supported conversions include:
+
+- `[label](url)` to `[url=url]label[/url]`
+- `![alt](url)` to `[img]url[/img]`
+- `**bold**` to `[b]bold[/b]`
+- `*italic*` to `[i]italic[/i]`
+- Markdown headings to `[b]heading[/b]`
+- Markdown blockquotes to `[quote]...[/quote]`
+- Markdown lists to `[list]`, `[list=1]` and `[*]`
+- fenced code blocks to `[code]...[/code]`
+- inline code to `[icode]...[/icode]`
 
 ## Frontend installation
 
@@ -243,8 +328,8 @@ Load the frontend assets in a template that is available on editor pages:
 During development, cache-bust manually:
 
 ```html
-<link rel="stylesheet" href="/js/vbulletinbytools_ai.css?v=12">
-<script src="/js/vbulletinbytools_ai.js?v=12"></script>
+<link rel="stylesheet" href="/js/vbulletinbytools_ai.css?v=14">
+<script src="/js/vbulletinbytools_ai.js?v=14"></script>
 ```
 
 ## Testing backend
@@ -272,6 +357,32 @@ Expected result:
 }
 ```
 
+## Troubleshooting
+
+If the panel shows `Invalid JSON response from Tornevall Tools`, the upstream gateway returned something that was not JSON. The current client should expose diagnostics such as:
+
+```text
+HTTP status
+Content-Type
+Request bytes
+Response bytes
+Raw preview
+```
+
+Common causes:
+
+- Missing or invalid token from Tornevall Tools
+- HTML error page from the gateway
+- Request too large after adding thread context
+- Timeout or upstream 5xx error
+- Web search failure upstream
+
+Check the server log after a failed request:
+
+```bash
+tail -n 120 /var/log/apache2/error.log
+```
+
 ## Security notes
 
 - The API token must only be read server-side.
@@ -279,6 +390,10 @@ Expected result:
 - Do not commit real tokens to the repository.
 - Rotate any token that has been visible in screenshots or logs.
 - Keep `tornis_tools_gpt_secret` default empty in product XML exports.
+
+## Changelog
+
+See [CHANGELOG.md](CHANGELOG.md).
 
 ## Development notes
 
