@@ -26,6 +26,7 @@ class vbulletinbytools_Api_Ai extends vB_Api
         'test',
         'personaDebug',
         'threadDebug',
+        'privacyDebug',
     );
 
     public function test()
@@ -62,6 +63,31 @@ class vbulletinbytools_Api_Ai extends vB_Api
             );
         } catch (Throwable $e) {
             return $this->apiSafeError('personaDebug failed', $e);
+        }
+    }
+
+    public function privacyDebug()
+    {
+        try {
+            $options = vB::getDatastore()->getValue('options');
+            $privacy = $this->resolvePrivacySettings($options);
+
+            return array(
+                'ok' => true,
+                'userid' => $this->getCurrentUserId(),
+                'username' => $this->getUsernameByUserId($this->getCurrentUserId()),
+                'ai_enabled' => $privacy['ai_enabled'],
+                'ai_enabled_source' => $privacy['ai_enabled_source'],
+                'context_mode' => $privacy['context_mode'],
+                'context_mode_source' => $privacy['context_mode_source'],
+                'global_context_mode' => $privacy['global_context_mode'],
+                'profile_ai_enabled_field_id' => $privacy['profile_ai_enabled_field_id'],
+                'profile_ai_enabled_raw' => $privacy['profile_ai_enabled_raw'],
+                'profile_context_mode_field_id' => $privacy['profile_context_mode_field_id'],
+                'profile_context_mode_raw' => $privacy['profile_context_mode_raw'],
+            );
+        } catch (Throwable $e) {
+            return $this->apiSafeError('privacyDebug failed', $e);
         }
     }
 
@@ -124,6 +150,24 @@ class vbulletinbytools_Api_Ai extends vB_Api
             );
         }
 
+        $privacy = $this->resolvePrivacySettings($options);
+
+        if (!$privacy['ai_enabled']) {
+            return array(
+                'ok' => true,
+                'gateway_ok' => false,
+                'error' => 'AI is disabled in your profile.',
+                'text' => 'AI is disabled in your profile.',
+                'vbulletin' => array(
+                    'userid' => $this->getCurrentUserId(),
+                    'ai_enabled' => false,
+                    'ai_enabled_source' => $privacy['ai_enabled_source'],
+                    'context_mode' => $privacy['context_mode'],
+                    'context_mode_source' => $privacy['context_mode_source'],
+                ),
+            );
+        }
+
         $token = '';
         if (!empty($options['tornis_tools_gpt_secret'])) {
             $token = trim((string) $options['tornis_tools_gpt_secret']);
@@ -158,15 +202,22 @@ class vbulletinbytools_Api_Ai extends vB_Api
         }
 
         $threadContext = '';
-        if ($nodeid > 0) {
-            $threadContext = $this->getThreadContextFromNodeId($nodeid);
+        $contextSentToGateway = true;
+
+        if ($privacy['context_mode'] === 'request_only') {
+            $context = 'Forum/editor/thread context omitted because the resolved AI context privacy mode is request_only.';
+            $contextSentToGateway = false;
+        } else {
+            if ($nodeid > 0) {
+                $threadContext = $this->getThreadContextFromNodeId($nodeid);
+            }
+
+            if ($threadContext !== '') {
+                $context = trim($context . "\n\nServer-side vBulletin thread context:\n" . $threadContext);
+            }
         }
 
-        if ($threadContext !== '') {
-            $context = trim($context . "\n\nServer-side vBulletin thread context:\n" . $threadContext);
-        }
-
-        $sourceSensitiveRequest = $this->isSourceSensitiveRequest($prompt . "\n" . $context);
+        $sourceSensitiveRequest = $this->isSourceSensitiveRequest($prompt . "\n" . ($contextSentToGateway ? $context : ''));
 
         if ($sourceSensitiveRequest) {
             $context = trim($context . "\n\nSource verification rules:\n" . implode("\n", array(
@@ -207,6 +258,11 @@ class vbulletinbytools_Api_Ai extends vB_Api
                 'userid' => $userid,
                 'username' => $username,
                 'nodeid' => $nodeid,
+                'ai_enabled' => $privacy['ai_enabled'],
+                'ai_enabled_source' => $privacy['ai_enabled_source'],
+                'context_mode' => $privacy['context_mode'],
+                'context_mode_source' => $privacy['context_mode_source'],
+                'context_sent_to_gateway' => $contextSentToGateway,
                 'has_thread_context' => ($threadContext !== ''),
                 'thread_context_length' => strlen($threadContext),
                 'persona_field_id' => $personaFieldId,
@@ -270,45 +326,165 @@ class vbulletinbytools_Api_Ai extends vB_Api
         ));
     }
 
+    private function resolvePrivacySettings($options)
+    {
+        $globalContextMode = $this->normalizeContextMode($this->getOptionString($options, 'tornis_tools_ai_context_mode', 'full'));
+        $contextMode = $globalContextMode;
+        $contextModeSource = 'admincp';
+
+        $profileContextModeFieldId = $this->getOptionInt($options, 'tornis_tools_ai_profile_context_mode_field', 0);
+        $profileContextModeRaw = '';
+
+        if ($profileContextModeFieldId > 0) {
+            $profileContextModeRaw = $this->getCurrentUserFieldValue($profileContextModeFieldId);
+            $profileContextMode = $this->normalizeContextMode($profileContextModeRaw, '');
+
+            if ($profileContextMode !== '') {
+                $contextMode = $profileContextMode;
+                $contextModeSource = 'profile';
+            }
+        }
+
+        $aiEnabled = true;
+        $aiEnabledSource = 'admincp';
+        $profileAiEnabledFieldId = $this->getOptionInt($options, 'tornis_tools_ai_profile_enabled_field', 0);
+        $profileAiEnabledRaw = '';
+
+        if ($profileAiEnabledFieldId > 0) {
+            $profileAiEnabledRaw = $this->getCurrentUserFieldValue($profileAiEnabledFieldId);
+            $profileAiEnabled = $this->normalizeAiEnabled($profileAiEnabledRaw);
+
+            if ($profileAiEnabled !== null) {
+                $aiEnabled = $profileAiEnabled;
+                $aiEnabledSource = 'profile';
+            }
+        }
+
+        return array(
+            'ai_enabled' => $aiEnabled,
+            'ai_enabled_source' => $aiEnabledSource,
+            'context_mode' => $contextMode,
+            'context_mode_source' => $contextModeSource,
+            'global_context_mode' => $globalContextMode,
+            'profile_ai_enabled_field_id' => $profileAiEnabledFieldId,
+            'profile_ai_enabled_raw' => $profileAiEnabledRaw,
+            'profile_context_mode_field_id' => $profileContextModeFieldId,
+            'profile_context_mode_raw' => $profileContextModeRaw,
+        );
+    }
+
+    private function normalizeContextMode($value, $default = 'full')
+    {
+        $value = $this->lower((string) $value);
+        $value = trim(str_replace(array('-', ' '), '_', $value));
+
+        if ($value === '') {
+            return $default;
+        }
+
+        $requestOnlyValues = array(
+            'request_only',
+            'prompt_only',
+            'instruction_only',
+            'only_request',
+            'only_prompt',
+            'no_context',
+            'minimal',
+            'none',
+            'bara_önskemål',
+            'bara_onskemal',
+            'endast_önskemål',
+            'endast_onskemal',
+            'ingen_context',
+            'ingen_kontext',
+        );
+
+        if (in_array($value, $requestOnlyValues, true)) {
+            return 'request_only';
+        }
+
+        $fullValues = array(
+            'full',
+            'full_context',
+            'thread_context',
+            'complete',
+            'all',
+            'hela_contexten',
+            'hela_kontexten',
+            'fullständig',
+            'fullstandig',
+        );
+
+        if (in_array($value, $fullValues, true)) {
+            return 'full';
+        }
+
+        return $default;
+    }
+
+    private function normalizeAiEnabled($value)
+    {
+        $value = $this->lower((string) $value);
+        $value = trim(str_replace(array('-', ' '), '_', $value));
+
+        if ($value === '') {
+            return null;
+        }
+
+        $disabledValues = array(
+            '0',
+            'false',
+            'no',
+            'nej',
+            'off',
+            'disabled',
+            'disable',
+            'av',
+            'avstängd',
+            'avstangd',
+            'stäng_av',
+            'stang_av',
+            'ai_off',
+            'ai_disabled',
+        );
+
+        if (in_array($value, $disabledValues, true)) {
+            return false;
+        }
+
+        $enabledValues = array(
+            '1',
+            'true',
+            'yes',
+            'ja',
+            'on',
+            'enabled',
+            'enable',
+            'på',
+            'pa',
+            'aktiv',
+            'active',
+            'ai_on',
+            'ai_enabled',
+        );
+
+        if (in_array($value, $enabledValues, true)) {
+            return true;
+        }
+
+        return null;
+    }
+
     private function isSourceSensitiveRequest($text)
     {
-        $text = mb_strtolower((string) $text, 'UTF-8');
+        $text = $this->lower((string) $text);
 
         $needles = array(
-            'källa',
-            'källor',
-            'källhänvisning',
-            'källhänvisningar',
-            'referens',
-            'referenser',
-            'citat',
-            'citera',
-            'länk',
-            'länkar',
-            'url',
-            'artikel',
-            'artiklar',
-            'fakta',
-            'faktakoll',
-            'verifiera',
-            'bekräfta',
-            'belägg',
-            'source',
-            'sources',
-            'citation',
-            'citations',
-            'reference',
-            'references',
-            'link',
-            'links',
-            'url',
-            'article',
-            'articles',
-            'fact check',
-            'fact-check',
-            'verify',
-            'verified',
-            'evidence',
+            'källa', 'källor', 'källhänvisning', 'källhänvisningar', 'referens', 'referenser',
+            'citat', 'citera', 'länk', 'länkar', 'url', 'artikel', 'artiklar', 'fakta', 'faktakoll',
+            'verifiera', 'bekräfta', 'belägg', 'source', 'sources', 'citation', 'citations',
+            'reference', 'references', 'link', 'links', 'article', 'articles', 'fact check',
+            'fact-check', 'verify', 'verified', 'evidence',
         );
 
         foreach ($needles as $needle) {
@@ -370,6 +546,11 @@ class vbulletinbytools_Api_Ai extends vB_Api
 
     private function getCurrentUserPersona($fieldId)
     {
+        return $this->getCurrentUserFieldValue($fieldId);
+    }
+
+    private function getCurrentUserFieldValue($fieldId)
+    {
         $userid = $this->getCurrentUserId();
 
         if ($userid <= 0) {
@@ -384,16 +565,16 @@ class vbulletinbytools_Api_Ai extends vB_Api
 
         $fieldName = 'field' . $fieldId;
 
-        $persona = $this->readUserFieldWithAssertorGetRow($userid, $fieldName);
+        $value = $this->readUserFieldWithAssertorGetRow($userid, $fieldName);
 
-        if ($persona !== '') {
-            return $persona;
+        if ($value !== '') {
+            return $value;
         }
 
-        $persona = $this->readUserFieldWithAssertorSelect($userid, $fieldName);
+        $value = $this->readUserFieldWithAssertorSelect($userid, $fieldName);
 
-        if ($persona !== '') {
-            return $persona;
+        if ($value !== '') {
+            return $value;
         }
 
         return '';
@@ -745,5 +926,25 @@ class vbulletinbytools_Api_Ai extends vB_Api
         }
 
         return (int) $default;
+    }
+
+    private function getOptionString($options, $name, $default)
+    {
+        if (isset($options[$name]) && trim((string) $options[$name]) !== '') {
+            return trim((string) $options[$name]);
+        }
+
+        return (string) $default;
+    }
+
+    private function lower($value)
+    {
+        $value = (string) $value;
+
+        if (function_exists('mb_strtolower')) {
+            return mb_strtolower($value, 'UTF-8');
+        }
+
+        return strtolower($value);
     }
 }
