@@ -26,6 +26,13 @@ This changelog starts from the first repository commit and includes the implemen
   - New `TornevallTools_DirectOpenAiClient` uses the OpenAI Responses API directly.
   - New `providerDebug` API method reports the selected provider and whether each provider has credentials configured.
   - Source-sensitive requests continue to force web search. With Direct OpenAI selected, web search is sent through OpenAI `web_search_preview` tooling.
+- Merged AI context privacy controls into the generic provider branch:
+  - `privacyDebug` is available together with `providerDebug`.
+  - `tornis_tools_ai_context_mode` works with both Tornevall Tools and Direct OpenAI.
+  - `tornis_tools_ai_profile_context_mode_field` can override AdminCP context mode per user.
+  - `tornis_tools_ai_profile_enabled_field` can disable AI per user.
+  - Profile-level settings take precedence over AdminCP defaults.
+  - Product XML now includes both provider settings and privacy settings in the same settings group.
 
 ## 2026-06-05
 
