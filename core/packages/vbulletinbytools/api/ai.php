@@ -26,6 +26,7 @@ class vbulletinbytools_Api_Ai extends vB_Api
         'test',
         'personaDebug',
         'threadDebug',
+        'providerDebug',
     );
 
     public function test()
@@ -37,11 +38,29 @@ class vbulletinbytools_Api_Ai extends vB_Api
         );
     }
 
+    public function providerDebug()
+    {
+        try {
+            $options = vB::getDatastore()->getValue('options');
+            $provider = $this->getAiProvider($options);
+
+            return array(
+                'ok' => true,
+                'provider' => $provider,
+                'tools_configured' => !empty($options['tornis_tools_gpt_secret']),
+                'openai_configured' => !empty($options['tornis_tools_openai_api_key']),
+                'openai_base_url' => $this->getOptionString($options, 'tornis_tools_openai_base_url', 'https://api.openai.com/v1'),
+                'openai_model' => $this->getOptionString($options, 'tornis_tools_openai_model', 'gpt-4o-mini'),
+            );
+        } catch (Throwable $e) {
+            return $this->apiSafeError('providerDebug failed', $e);
+        }
+    }
+
     public function personaDebug()
     {
         try {
             $options = vB::getDatastore()->getValue('options');
-
             $personaFieldId = $this->getOptionInt($options, 'tornis_tools_gpt_persona_field', 0);
             $userid = $this->getCurrentUserId();
             $username = $this->getUsernameByUserId($userid);
@@ -105,49 +124,17 @@ class vbulletinbytools_Api_Ai extends vB_Api
         $nodeid = (int) $nodeid;
 
         if ($prompt === '') {
-            return array(
-                'ok' => true,
-                'gateway_ok' => false,
-                'error' => 'Prompt is required.',
-                'text' => 'Prompt is required.',
-            );
+            return $this->localFailure('Prompt is required.');
         }
 
         $options = vB::getDatastore()->getValue('options');
 
         if (empty($options['tornis_tools_ai_enabled'])) {
-            return array(
-                'ok' => true,
-                'gateway_ok' => false,
-                'error' => 'Tornevall Tools AI is disabled.',
-                'text' => 'Tornevall Tools AI is disabled.',
-            );
+            return $this->localFailure('Tornevall Tools AI is disabled.');
         }
 
-        $token = '';
-        if (!empty($options['tornis_tools_gpt_secret'])) {
-            $token = trim((string) $options['tornis_tools_gpt_secret']);
-        }
-
-        if ($token === '') {
-            return array(
-                'ok' => true,
-                'gateway_ok' => false,
-                'error' => 'Tornevall Tools API token is missing.',
-                'text' => 'Tornevall Tools API token is missing.',
-            );
-        }
-
-        $baseUrl = 'https://tools.tornevall.net';
-        if (!empty($options['tornis_tools_api_base_url'])) {
-            $baseUrl = rtrim((string) $options['tornis_tools_api_base_url'], '/');
-        }
-
-        $clientSlug = 'vbulletin_wysiwyg_assistant';
-        if (!empty($options['tornis_tools_ai_client_slug'])) {
-            $clientSlug = trim((string) $options['tornis_tools_ai_client_slug']);
-        }
-
+        $provider = $this->getAiProvider($options);
+        $clientSlug = $this->getOptionString($options, 'tornis_tools_ai_client_slug', 'vbulletin_wysiwyg_assistant');
         $personaFieldId = $this->getOptionInt($options, 'tornis_tools_gpt_persona_field', 0);
         $userid = $this->getCurrentUserId();
         $username = $this->getUsernameByUserId($userid);
@@ -158,6 +145,7 @@ class vbulletinbytools_Api_Ai extends vB_Api
         }
 
         $threadContext = '';
+
         if ($nodeid > 0) {
             $threadContext = $this->getThreadContextFromNodeId($nodeid);
         }
@@ -178,25 +166,11 @@ class vbulletinbytools_Api_Ai extends vB_Api
             )));
         }
 
-        $fullContext = $this->buildFullContext($context, $persona, $personaFieldId, $userid, $username);
-
+        $fullContext = $this->buildFullContext($context, $persona, $userid, $username);
         $useWebSearch = !empty($options['tornis_tools_ai_web_search_enabled']) || $sourceSensitiveRequest;
         $webSearchRequired = !empty($options['tornis_tools_ai_web_search_required']) || $sourceSensitiveRequest;
 
-        require_once(DIR . '/packages/vbulletinbytools/library/TornevallTools/OpenAiClient.php');
-
-        if (!class_exists('TornevallTools_OpenAiClient')) {
-            return array(
-                'ok' => true,
-                'gateway_ok' => false,
-                'error' => 'TornevallTools_OpenAiClient was not loaded.',
-                'text' => 'TornevallTools_OpenAiClient was not loaded. Check package file path.',
-            );
-        }
-
-        $client = new TornevallTools_OpenAiClient($baseUrl, $token);
-
-        return $client->respond(array(
+        $payload = array(
             'client_slug' => $clientSlug,
             'context' => $fullContext,
             'user_prompt' => $prompt,
@@ -207,6 +181,7 @@ class vbulletinbytools_Api_Ai extends vB_Api
                 'userid' => $userid,
                 'username' => $username,
                 'nodeid' => $nodeid,
+                'provider' => $provider,
                 'has_thread_context' => ($threadContext !== ''),
                 'thread_context_length' => strlen($threadContext),
                 'persona_field_id' => $personaFieldId,
@@ -216,10 +191,59 @@ class vbulletinbytools_Api_Ai extends vB_Api
                 'use_web_search' => $useWebSearch,
                 'web_search_required' => $webSearchRequired,
             ),
-        ));
+        );
+
+        if ($provider === 'openai') {
+            return $this->respondWithOpenAi($options, $payload);
+        }
+
+        return $this->respondWithTornevallTools($options, $payload);
     }
 
-    private function buildFullContext($context, $persona, $personaFieldId, $userid, $username)
+    private function respondWithTornevallTools($options, array $payload)
+    {
+        $token = $this->getOptionString($options, 'tornis_tools_gpt_secret', '');
+
+        if ($token === '') {
+            return $this->localFailure('Tornevall Tools API token is missing.');
+        }
+
+        $baseUrl = $this->getOptionString($options, 'tornis_tools_api_base_url', 'https://tools.tornevall.net');
+        $baseUrl = rtrim($baseUrl, '/');
+
+        require_once(DIR . '/packages/vbulletinbytools/library/TornevallTools/OpenAiClient.php');
+
+        if (!class_exists('TornevallTools_OpenAiClient')) {
+            return $this->localFailure('TornevallTools_OpenAiClient was not loaded. Check package file path.');
+        }
+
+        $client = new TornevallTools_OpenAiClient($baseUrl, $token);
+        return $client->respond($payload);
+    }
+
+    private function respondWithOpenAi($options, array $payload)
+    {
+        $apiKey = $this->getOptionString($options, 'tornis_tools_openai_api_key', '');
+
+        if ($apiKey === '') {
+            return $this->localFailure('OpenAI API key is missing.');
+        }
+
+        $baseUrl = $this->getOptionString($options, 'tornis_tools_openai_base_url', 'https://api.openai.com/v1');
+        $model = $this->getOptionString($options, 'tornis_tools_openai_model', 'gpt-4o-mini');
+        $timeout = $this->getOptionInt($options, 'tornis_tools_openai_timeout', 60);
+
+        require_once(DIR . '/packages/vbulletinbytools/library/TornevallTools/DirectOpenAiClient.php');
+
+        if (!class_exists('TornevallTools_DirectOpenAiClient')) {
+            return $this->localFailure('TornevallTools_DirectOpenAiClient was not loaded. Check package file path.');
+        }
+
+        $client = new TornevallTools_DirectOpenAiClient($baseUrl, $apiKey, $model, $timeout);
+        return $client->respond($payload);
+    }
+
+    private function buildFullContext($context, $persona, $userid, $username)
     {
         $context = trim((string) $context);
         $persona = trim((string) $persona);
@@ -270,45 +294,28 @@ class vbulletinbytools_Api_Ai extends vB_Api
         ));
     }
 
+    private function getAiProvider($options)
+    {
+        $provider = $this->getOptionString($options, 'tornis_tools_ai_provider', 'tornevall_tools');
+        $provider = strtolower(trim(str_replace(array('-', ' '), '_', $provider)));
+
+        if (in_array($provider, array('openai', 'direct_openai', 'openai_direct'), true)) {
+            return 'openai';
+        }
+
+        return 'tornevall_tools';
+    }
+
     private function isSourceSensitiveRequest($text)
     {
-        $text = mb_strtolower((string) $text, 'UTF-8');
+        $text = $this->lower((string) $text);
 
         $needles = array(
-            'källa',
-            'källor',
-            'källhänvisning',
-            'källhänvisningar',
-            'referens',
-            'referenser',
-            'citat',
-            'citera',
-            'länk',
-            'länkar',
-            'url',
-            'artikel',
-            'artiklar',
-            'fakta',
-            'faktakoll',
-            'verifiera',
-            'bekräfta',
-            'belägg',
-            'source',
-            'sources',
-            'citation',
-            'citations',
-            'reference',
-            'references',
-            'link',
-            'links',
-            'url',
-            'article',
-            'articles',
-            'fact check',
-            'fact-check',
-            'verify',
-            'verified',
-            'evidence',
+            'källa', 'källor', 'källhänvisning', 'källhänvisningar', 'referens', 'referenser',
+            'citat', 'citera', 'länk', 'länkar', 'url', 'artikel', 'artiklar', 'fakta', 'faktakoll',
+            'verifiera', 'bekräfta', 'belägg', 'source', 'sources', 'citation', 'citations',
+            'reference', 'references', 'link', 'links', 'article', 'articles', 'fact check',
+            'fact-check', 'verify', 'verified', 'evidence',
         );
 
         foreach ($needles as $needle) {
@@ -318,6 +325,16 @@ class vbulletinbytools_Api_Ai extends vB_Api
         }
 
         return false;
+    }
+
+    private function localFailure($message)
+    {
+        return array(
+            'ok' => true,
+            'gateway_ok' => false,
+            'error' => $message,
+            'text' => $message,
+        );
     }
 
     private function apiSafeError($prefix, Throwable $e)
@@ -370,6 +387,11 @@ class vbulletinbytools_Api_Ai extends vB_Api
 
     private function getCurrentUserPersona($fieldId)
     {
+        return $this->getCurrentUserFieldValue($fieldId);
+    }
+
+    private function getCurrentUserFieldValue($fieldId)
+    {
         $userid = $this->getCurrentUserId();
 
         if ($userid <= 0) {
@@ -383,34 +405,20 @@ class vbulletinbytools_Api_Ai extends vB_Api
         }
 
         $fieldName = 'field' . $fieldId;
+        $value = $this->readUserFieldWithAssertorGetRow($userid, $fieldName);
 
-        $persona = $this->readUserFieldWithAssertorGetRow($userid, $fieldName);
-
-        if ($persona !== '') {
-            return $persona;
+        if ($value !== '') {
+            return $value;
         }
 
-        $persona = $this->readUserFieldWithAssertorSelect($userid, $fieldName);
-
-        if ($persona !== '') {
-            return $persona;
-        }
-
-        return '';
+        return $this->readUserFieldWithAssertorSelect($userid, $fieldName);
     }
 
     private function readUserFieldWithAssertorGetRow($userid, $fieldName)
     {
-        $tablesToTry = array(
-            'vBForum:userfield',
-            'userfield',
-        );
-
-        foreach ($tablesToTry as $tableName) {
+        foreach (array('vBForum:userfield', 'userfield') as $tableName) {
             try {
-                $row = vB::getDbAssertor()->getRow($tableName, array(
-                    'userid' => (int) $userid,
-                ));
+                $row = vB::getDbAssertor()->getRow($tableName, array('userid' => (int) $userid));
 
                 if (is_array($row) && array_key_exists($fieldName, $row)) {
                     return trim((string) $row[$fieldName]);
@@ -425,12 +433,7 @@ class vbulletinbytools_Api_Ai extends vB_Api
 
     private function readUserFieldWithAssertorSelect($userid, $fieldName)
     {
-        $tablesToTry = array(
-            'vBForum:userfield',
-            'userfield',
-        );
-
-        foreach ($tablesToTry as $tableName) {
+        foreach (array('vBForum:userfield', 'userfield') as $tableName) {
             try {
                 if (!class_exists('vB_dB_Query')) {
                     continue;
@@ -440,10 +443,6 @@ class vbulletinbytools_Api_Ai extends vB_Api
                     vB_dB_Query::TYPE_KEY => vB_dB_Query::QUERY_SELECT,
                     'userid' => (int) $userid,
                 ));
-
-                if (!$rows) {
-                    continue;
-                }
 
                 foreach ($rows as $row) {
                     if (is_array($row) && array_key_exists($fieldName, $row)) {
@@ -466,14 +465,7 @@ class vbulletinbytools_Api_Ai extends vB_Api
             return '';
         }
 
-        $maxPosts = 30;
-        $maxChars = 18000;
-        $nodes = $this->getThreadNodes($nodeid, $maxPosts);
-
-        if (empty($nodes)) {
-            return '';
-        }
-
+        $nodes = $this->getThreadNodes($nodeid, 30);
         $parts = array();
 
         foreach ($nodes as $index => $node) {
@@ -507,14 +499,13 @@ class vbulletinbytools_Api_Ai extends vB_Api
             $entry[] = 'Node ID: ' . $postNodeId;
             $entry[] = 'Text:';
             $entry[] = $this->cleanContextText($text);
-
             $parts[] = implode("\n", $entry);
         }
 
         $context = implode("\n\n", $parts);
 
-        if (strlen($context) > $maxChars) {
-            $context = substr($context, 0, $maxChars) . "\n\n[Server-side thread context truncated]";
+        if (strlen($context) > 18000) {
+            $context = substr($context, 0, 18000) . "\n\n[Server-side thread context truncated]";
         }
 
         return $context;
@@ -522,17 +513,6 @@ class vbulletinbytools_Api_Ai extends vB_Api
 
     private function getThreadNodes($nodeid, $maxPosts)
     {
-        $nodeid = (int) $nodeid;
-        $maxPosts = (int) $maxPosts;
-
-        if ($nodeid <= 0) {
-            return array();
-        }
-
-        if ($maxPosts <= 0) {
-            $maxPosts = 30;
-        }
-
         $nodesById = array();
         $root = $this->getNodeRow($nodeid);
 
@@ -540,18 +520,12 @@ class vbulletinbytools_Api_Ai extends vB_Api
             $nodesById[(int) $root['nodeid']] = $root;
         }
 
-        $starterId = $nodeid;
+        $starterId = (is_array($root) && !empty($root['starter'])) ? (int) $root['starter'] : (int) $nodeid;
 
-        if (is_array($root) && !empty($root['starter'])) {
-            $starterId = (int) $root['starter'];
-        }
-
-        $replySets = array(
+        foreach (array(
             $this->getNodeRowsByField('starter', $starterId, $maxPosts),
             $this->getNodeRowsByField('parentid', $nodeid, $maxPosts),
-        );
-
-        foreach ($replySets as $rows) {
+        ) as $rows) {
             foreach ($rows as $row) {
                 if (is_array($row) && !empty($row['nodeid'])) {
                     $nodesById[(int) $row['nodeid']] = $row;
@@ -572,21 +546,14 @@ class vbulletinbytools_Api_Ai extends vB_Api
             return $aDate <=> $bDate;
         });
 
-        return array_slice($nodes, 0, $maxPosts);
+        return array_slice($nodes, 0, (int) $maxPosts);
     }
 
     private function getNodeRow($nodeid)
     {
-        $tablesToTry = array(
-            'vBForum:node',
-            'node',
-        );
-
-        foreach ($tablesToTry as $tableName) {
+        foreach (array('vBForum:node', 'node') as $tableName) {
             try {
-                $row = vB::getDbAssertor()->getRow($tableName, array(
-                    'nodeid' => (int) $nodeid,
-                ));
+                $row = vB::getDbAssertor()->getRow($tableName, array('nodeid' => (int) $nodeid));
 
                 if (is_array($row) && !empty($row['nodeid'])) {
                     return $row;
@@ -601,29 +568,11 @@ class vbulletinbytools_Api_Ai extends vB_Api
 
     private function getNodeRowsByField($fieldName, $value, $limit)
     {
-        $allowedFields = array(
-            'starter',
-            'parentid',
-            'nodeid',
-        );
-
-        if (!in_array($fieldName, $allowedFields, true)) {
+        if (!in_array($fieldName, array('starter', 'parentid', 'nodeid'), true)) {
             return array();
         }
 
-        $value = (int) $value;
-        $limit = (int) $limit;
-
-        if ($value <= 0) {
-            return array();
-        }
-
-        $tablesToTry = array(
-            'vBForum:node',
-            'node',
-        );
-
-        foreach ($tablesToTry as $tableName) {
+        foreach (array('vBForum:node', 'node') as $tableName) {
             try {
                 if (!class_exists('vB_dB_Query')) {
                     continue;
@@ -631,12 +580,8 @@ class vbulletinbytools_Api_Ai extends vB_Api
 
                 $rows = vB::getDbAssertor()->assertQuery($tableName, array(
                     vB_dB_Query::TYPE_KEY => vB_dB_Query::QUERY_SELECT,
-                    $fieldName => $value,
+                    $fieldName => (int) $value,
                 ));
-
-                if (!$rows) {
-                    continue;
-                }
 
                 $result = array();
 
@@ -644,7 +589,7 @@ class vbulletinbytools_Api_Ai extends vB_Api
                     if (is_array($row)) {
                         $result[] = $row;
 
-                        if (count($result) >= $limit) {
+                        if (count($result) >= (int) $limit) {
                             break;
                         }
                     }
@@ -663,34 +608,15 @@ class vbulletinbytools_Api_Ai extends vB_Api
 
     private function getNodeText($nodeid)
     {
-        $nodeid = (int) $nodeid;
-
-        if ($nodeid <= 0) {
-            return '';
-        }
-
-        $tablesToTry = array(
-            'vBForum:text',
-            'text',
-        );
-
-        foreach ($tablesToTry as $tableName) {
+        foreach (array('vBForum:text', 'text') as $tableName) {
             try {
-                $row = vB::getDbAssertor()->getRow($tableName, array(
-                    'nodeid' => $nodeid,
-                ));
+                $row = vB::getDbAssertor()->getRow($tableName, array('nodeid' => (int) $nodeid));
 
                 if (!is_array($row)) {
                     continue;
                 }
 
-                $textFields = array(
-                    'rawtext',
-                    'pagetext',
-                    'text',
-                );
-
-                foreach ($textFields as $textField) {
+                foreach (array('rawtext', 'pagetext', 'text') as $textField) {
                     if (!empty($row[$textField])) {
                         return trim(strip_tags((string) $row[$textField]));
                     }
@@ -711,16 +637,9 @@ class vbulletinbytools_Api_Ai extends vB_Api
             return '';
         }
 
-        $tablesToTry = array(
-            'vBForum:user',
-            'user',
-        );
-
-        foreach ($tablesToTry as $tableName) {
+        foreach (array('vBForum:user', 'user') as $tableName) {
             try {
-                $row = vB::getDbAssertor()->getRow($tableName, array(
-                    'userid' => $userid,
-                ));
+                $row = vB::getDbAssertor()->getRow($tableName, array('userid' => $userid));
 
                 if (is_array($row) && !empty($row['username'])) {
                     return trim((string) $row['username']);
@@ -745,5 +664,23 @@ class vbulletinbytools_Api_Ai extends vB_Api
         }
 
         return (int) $default;
+    }
+
+    private function getOptionString($options, $name, $default)
+    {
+        if (isset($options[$name]) && trim((string) $options[$name]) !== '') {
+            return trim((string) $options[$name]);
+        }
+
+        return (string) $default;
+    }
+
+    private function lower($value)
+    {
+        if (function_exists('mb_strtolower')) {
+            return mb_strtolower((string) $value, 'UTF-8');
+        }
+
+        return strtolower((string) $value);
     }
 }
