@@ -19,6 +19,13 @@ This changelog starts from the first repository commit and includes the implemen
 - Added automatic source verification mode for prompts that ask for sources, citations, references, links, facts or fact checking.
 - Added forced Tornevall Tools web search for source-sensitive requests instead of only relying on the global `tornis_tools_ai_web_search_enabled` option.
 - Added stricter prompt rules that forbid invented references and require either verified links/citations or an explicit note that no verified source was found.
+- Added generic AI provider selection:
+  - New AdminCP option `tornis_tools_ai_provider` selects between `tornevall_tools` and `openai`.
+  - Existing Tornevall Tools settings are kept unchanged.
+  - Direct OpenAI settings were added: `tornis_tools_openai_api_key`, `tornis_tools_openai_base_url`, `tornis_tools_openai_model` and `tornis_tools_openai_timeout`.
+  - New `TornevallTools_DirectOpenAiClient` uses the OpenAI Responses API directly.
+  - New `providerDebug` API method reports the selected provider and whether each provider has credentials configured.
+  - Source-sensitive requests continue to force web search. With Direct OpenAI selected, web search is sent through OpenAI `web_search_preview` tooling.
 
 ## 2026-06-05
 
