@@ -19,6 +19,24 @@ This changelog starts from the first repository commit and includes the implemen
 - Added automatic source verification mode for prompts that ask for sources, citations, references, links, facts or fact checking.
 - Added forced Tornevall Tools web search for source-sensitive requests instead of only relying on the global `tornis_tools_ai_web_search_enabled` option.
 - Added stricter prompt rules that forbid invented references and require either verified links/citations or an explicit note that no verified source was found.
+- Added AI context privacy controls in `core/packages/vbulletinbytools/api/ai.php`:
+  - AdminCP option `tornis_tools_ai_context_mode` controls whether full forum/editor/thread context or only the request is sent.
+  - Profile field option `tornis_tools_ai_profile_context_mode_field` can override the AdminCP context mode per user.
+  - Profile field option `tornis_tools_ai_profile_enabled_field` can disable AI per user.
+  - Profile-level settings take precedence over AdminCP defaults.
+  - New `privacyDebug` API method reports resolved privacy settings for the current user.
+  - AI payload now includes resolved privacy metadata such as `context_mode`, `context_mode_source`, `context_sent_to_gateway` and `ai_enabled_source`.
+- Added product XML options for the AI integration:
+  - `tornis_tools_ai_enabled`
+  - `tornis_tools_gpt_secret`
+  - `tornis_tools_api_base_url`
+  - `tornis_tools_ai_client_slug`
+  - `tornis_tools_gpt_persona_field`
+  - `tornis_tools_ai_web_search_enabled`
+  - `tornis_tools_ai_web_search_required`
+  - `tornis_tools_ai_context_mode`
+  - `tornis_tools_ai_profile_context_mode_field`
+  - `tornis_tools_ai_profile_enabled_field`
 
 ## 2026-06-05
 
