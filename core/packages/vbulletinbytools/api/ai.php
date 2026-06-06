@@ -58,26 +58,48 @@ class vbulletinbytools_Api_Ai extends vB_Api
         }
     }
 
-    public function privacyDebug()
+    public function privacyDebug($nodeid = 0)
     {
         try {
             $options = vB::getDatastore()->getValue('options');
             $privacy = $this->resolvePrivacySettings($options);
             $userid = $this->getCurrentUserId();
+            $nodeid = (int) $nodeid;
+            $privateDecision = $this->getPrivateNodeContextDecision($nodeid, $options);
+            $stats = $this->createContextStats();
+            $threadContext = '';
+
+            if ($nodeid > 0 && !$privateDecision['blocked']) {
+                $threadContext = $this->getThreadContextFromNodeId($nodeid, $privacy, $stats);
+            }
 
             return array(
                 'ok' => true,
                 'userid' => $userid,
                 'username' => $this->getUsernameByUserId($userid),
+                'provider' => $this->getAiProvider($options),
                 'ai_enabled' => $privacy['ai_enabled'],
                 'ai_enabled_source' => $privacy['ai_enabled_source'],
                 'context_mode' => $privacy['context_mode'],
                 'context_mode_source' => $privacy['context_mode_source'],
                 'global_context_mode' => $privacy['global_context_mode'],
+                'context_consent_mode' => $privacy['context_consent_mode'],
+                'context_consent_mode_source' => $privacy['context_consent_mode_source'],
+                'current_user_consent' => $privacy['current_user_consent'],
+                'current_user_consent_raw' => $privacy['current_user_consent_raw'],
+                'disable_context_in_private_nodes' => $privacy['disable_context_in_private_nodes'],
+                'private_node_context_blocked' => $privateDecision['blocked'],
+                'context_blocked_reason' => $privateDecision['reason'],
+                'private_node_detection' => $privateDecision,
                 'profile_ai_enabled_field_id' => $privacy['profile_ai_enabled_field_id'],
                 'profile_ai_enabled_raw' => $privacy['profile_ai_enabled_raw'],
                 'profile_context_mode_field_id' => $privacy['profile_context_mode_field_id'],
                 'profile_context_mode_raw' => $privacy['profile_context_mode_raw'],
+                'profile_context_consent_field_id' => $privacy['profile_context_consent_field_id'],
+                'has_thread_context' => ($threadContext !== ''),
+                'thread_context_length' => strlen($threadContext),
+                'thread_context_preview' => substr($threadContext, 0, 1200),
+                'context_stats' => $stats,
             );
         } catch (Throwable $e) {
             return $this->apiSafeError('privacyDebug failed', $e);
@@ -114,11 +136,15 @@ class vbulletinbytools_Api_Ai extends vB_Api
     public function threadDebug($nodeid = 0)
     {
         try {
+            $options = vB::getDatastore()->getValue('options');
+            $privacy = $this->resolvePrivacySettings($options);
             $nodeid = (int) $nodeid;
             $threadContext = '';
+            $stats = $this->createContextStats();
+            $privateDecision = $this->getPrivateNodeContextDecision($nodeid, $options);
 
-            if ($nodeid > 0) {
-                $threadContext = $this->getThreadContextFromNodeId($nodeid);
+            if ($nodeid > 0 && !$privateDecision['blocked']) {
+                $threadContext = $this->getThreadContextFromNodeId($nodeid, $privacy, $stats);
             }
 
             return array(
@@ -127,6 +153,10 @@ class vbulletinbytools_Api_Ai extends vB_Api
                 'has_thread_context' => ($threadContext !== ''),
                 'thread_context_length' => strlen($threadContext),
                 'thread_context_preview' => substr($threadContext, 0, 1200),
+                'private_node_context_blocked' => $privateDecision['blocked'],
+                'context_blocked_reason' => $privateDecision['reason'],
+                'context_consent_mode' => $privacy['context_consent_mode'],
+                'context_stats' => $stats,
             );
         } catch (Throwable $e) {
             return $this->apiSafeError('threadDebug failed', $e);
@@ -191,17 +221,30 @@ class vbulletinbytools_Api_Ai extends vB_Api
 
         $threadContext = '';
         $contextSentToGateway = true;
+        $contextBlockedReason = '';
+        $contextStats = $this->createContextStats();
+        $privateDecision = $this->getPrivateNodeContextDecision($nodeid, $options);
 
         if ($privacy['context_mode'] === 'request_only') {
             $context = 'Forum/editor/thread context omitted because the resolved AI context privacy mode is request_only.';
             $contextSentToGateway = false;
+            $contextBlockedReason = 'request_only';
+        } elseif ($privateDecision['blocked']) {
+            $context = 'Forum/editor/thread context omitted because private or restricted node protection blocked context.';
+            $contextSentToGateway = false;
+            $contextBlockedReason = $privateDecision['reason'];
+            $contextStats['context_posts_excluded_private_node'] = $contextStats['context_posts_total'];
         } else {
+            if ($privacy['context_consent_mode'] !== 'disabled') {
+                $context = 'Client-side visible forum context omitted because consent-aware server-side filtering is active.';
+            }
+
             if ($nodeid > 0) {
-                $threadContext = $this->getThreadContextFromNodeId($nodeid);
+                $threadContext = $this->getThreadContextFromNodeId($nodeid, $privacy, $contextStats);
             }
 
             if ($threadContext !== '') {
-                $context = trim($context . "\n\nServer-side vBulletin thread context:\n" . $threadContext);
+                $context = trim($context . "\n\nConsent-filtered server-side vBulletin thread context:\n" . $threadContext);
             }
         }
 
@@ -237,9 +280,16 @@ class vbulletinbytools_Api_Ai extends vB_Api
                 'ai_enabled_source' => $privacy['ai_enabled_source'],
                 'context_mode' => $privacy['context_mode'],
                 'context_mode_source' => $privacy['context_mode_source'],
+                'context_consent_mode' => $privacy['context_consent_mode'],
+                'context_consent_mode_source' => $privacy['context_consent_mode_source'],
+                'current_user_consent' => $privacy['current_user_consent'],
                 'context_sent_to_gateway' => $contextSentToGateway,
+                'context_blocked_reason' => $contextBlockedReason,
+                'private_node_context_blocked' => $privateDecision['blocked'],
+                'private_node_detection' => $privateDecision,
                 'has_thread_context' => ($threadContext !== ''),
                 'thread_context_length' => strlen($threadContext),
+                'context_stats' => $contextStats,
                 'persona_field_id' => $personaFieldId,
                 'persona_field_name' => ($personaFieldId > 0 ? 'field' . $personaFieldId : ''),
                 'has_persona' => ($persona !== ''),
@@ -384,6 +434,16 @@ class vbulletinbytools_Api_Ai extends vB_Api
             }
         }
 
+        $contextConsentMode = $this->normalizeConsentMode($this->getOptionString($options, 'tornis_tools_ai_context_consent_mode', 'require_opt_in'));
+        $profileContextConsentFieldId = $this->getOptionInt($options, 'tornis_tools_ai_profile_context_consent_field', 0);
+        $currentUserConsentRaw = '';
+        $currentUserConsent = null;
+
+        if ($profileContextConsentFieldId > 0) {
+            $currentUserConsentRaw = $this->getCurrentUserFieldValue($profileContextConsentFieldId);
+            $currentUserConsent = $this->normalizeConsentValue($currentUserConsentRaw);
+        }
+
         return array(
             'ai_enabled' => $aiEnabled,
             'ai_enabled_source' => $aiEnabledSource,
@@ -394,6 +454,12 @@ class vbulletinbytools_Api_Ai extends vB_Api
             'profile_ai_enabled_raw' => $profileAiEnabledRaw,
             'profile_context_mode_field_id' => $profileContextModeFieldId,
             'profile_context_mode_raw' => $profileContextModeRaw,
+            'context_consent_mode' => $contextConsentMode,
+            'context_consent_mode_source' => 'admincp',
+            'profile_context_consent_field_id' => $profileContextConsentFieldId,
+            'current_user_consent_raw' => $currentUserConsentRaw,
+            'current_user_consent' => $currentUserConsent,
+            'disable_context_in_private_nodes' => $this->getOptionBool($options, 'tornis_tools_ai_disable_context_in_private_nodes', true),
         );
     }
 
@@ -422,6 +488,48 @@ class vbulletinbytools_Api_Ai extends vB_Api
         }
 
         return $default;
+    }
+
+    private function normalizeConsentMode($value)
+    {
+        $value = $this->lower((string) $value);
+        $value = trim(str_replace(array('-', ' '), '_', $value));
+
+        if (in_array($value, array('allow_unless_opt_out', 'opt_out', 'unless_opt_out'), true)) {
+            return 'allow_unless_opt_out';
+        }
+
+        if (in_array($value, array('disabled', 'disable', 'off', 'none', 'no_filter'), true)) {
+            return 'disabled';
+        }
+
+        return 'require_opt_in';
+    }
+
+    private function normalizeConsentValue($value)
+    {
+        $value = $this->lower((string) $value);
+        $value = trim(str_replace(array('-', ' '), '_', $value));
+
+        if ($value === '') {
+            return null;
+        }
+
+        if (in_array($value, array(
+            '1', 'true', 'yes', 'ja', 'on', 'allow', 'allowed', 'consent', 'opt_in',
+            'ai_context_allowed', 'context_allowed', 'godkänn', 'godkann', 'medgivande',
+        ), true)) {
+            return 'opt_in';
+        }
+
+        if (in_array($value, array(
+            '0', 'false', 'no', 'nej', 'off', 'deny', 'denied', 'no_consent', 'opt_out',
+            'ai_context_denied', 'context_denied', 'avböj', 'avboj', 'inget_medgivande',
+        ), true)) {
+            return 'opt_out';
+        }
+
+        return null;
     }
 
     private function normalizeAiEnabled($value)
@@ -481,6 +589,21 @@ class vbulletinbytools_Api_Ai extends vB_Api
         }
 
         return false;
+    }
+
+    private function createContextStats()
+    {
+        return array(
+            'context_posts_total' => 0,
+            'context_posts_included' => 0,
+            'context_posts_excluded_missing_consent' => 0,
+            'context_posts_excluded_opt_out' => 0,
+            'context_posts_excluded_private_node' => 0,
+            'context_posts_excluded_unknown_author' => 0,
+            'context_posts_excluded_hidden_or_moderated' => 0,
+            'context_posts_excluded_empty_text' => 0,
+            'context_quotes_stripped' => 0,
+        );
     }
 
     private function localFailure($message)
@@ -548,15 +671,15 @@ class vbulletinbytools_Api_Ai extends vB_Api
 
     private function getCurrentUserFieldValue($fieldId)
     {
-        $userid = $this->getCurrentUserId();
+        return $this->getUserFieldValue($this->getCurrentUserId(), $fieldId);
+    }
 
-        if ($userid <= 0) {
-            return '';
-        }
-
+    private function getUserFieldValue($userid, $fieldId)
+    {
+        $userid = (int) $userid;
         $fieldId = (int) $fieldId;
 
-        if ($fieldId <= 0) {
+        if ($userid <= 0 || $fieldId <= 0) {
             return '';
         }
 
@@ -613,7 +736,7 @@ class vbulletinbytools_Api_Ai extends vB_Api
         return '';
     }
 
-    private function getThreadContextFromNodeId($nodeid)
+    private function getThreadContextFromNodeId($nodeid, array $privacy, array &$stats)
     {
         $nodeid = (int) $nodeid;
 
@@ -625,18 +748,41 @@ class vbulletinbytools_Api_Ai extends vB_Api
         $parts = array();
 
         foreach ($nodes as $index => $node) {
+            $stats['context_posts_total']++;
+
+            if ($this->isNodeHiddenOrModerated($node)) {
+                $stats['context_posts_excluded_hidden_or_moderated']++;
+                continue;
+            }
+
             $postNodeId = !empty($node['nodeid']) ? (int) $node['nodeid'] : 0;
 
             if ($postNodeId <= 0) {
+                $stats['context_posts_excluded_hidden_or_moderated']++;
+                continue;
+            }
+
+            $userid = !empty($node['userid']) ? (int) $node['userid'] : 0;
+            $authorAllowed = $this->isAuthorContextAllowed($userid, $privacy);
+
+            if (!$authorAllowed['allowed']) {
+                if ($authorAllowed['reason'] === 'unknown_author') {
+                    $stats['context_posts_excluded_unknown_author']++;
+                } elseif ($authorAllowed['reason'] === 'opt_out') {
+                    $stats['context_posts_excluded_opt_out']++;
+                } else {
+                    $stats['context_posts_excluded_missing_consent']++;
+                }
+
                 continue;
             }
 
             $title = !empty($node['title']) ? trim((string) $node['title']) : '';
-            $userid = !empty($node['userid']) ? (int) $node['userid'] : 0;
             $author = $this->getUsernameByUserId($userid);
-            $text = $this->getNodeText($postNodeId);
+            $text = $this->getNodeText($postNodeId, $stats);
 
             if ($text === '') {
+                $stats['context_posts_excluded_empty_text']++;
                 continue;
             }
 
@@ -656,6 +802,7 @@ class vbulletinbytools_Api_Ai extends vB_Api
             $entry[] = 'Text:';
             $entry[] = $this->cleanContextText($text);
             $parts[] = implode("\n", $entry);
+            $stats['context_posts_included']++;
         }
 
         $context = implode("\n\n", $parts);
@@ -665,6 +812,172 @@ class vbulletinbytools_Api_Ai extends vB_Api
         }
 
         return $context;
+    }
+
+    private function isAuthorContextAllowed($userid, array $privacy)
+    {
+        $userid = (int) $userid;
+        $mode = $privacy['context_consent_mode'];
+
+        if ($mode === 'disabled') {
+            return array('allowed' => true, 'reason' => 'consent_filter_disabled');
+        }
+
+        if ($userid <= 0) {
+            return array('allowed' => false, 'reason' => 'unknown_author');
+        }
+
+        $fieldId = (int) $privacy['profile_context_consent_field_id'];
+        $raw = '';
+        $consent = null;
+
+        if ($fieldId > 0) {
+            $raw = $this->getUserFieldValue($userid, $fieldId);
+            $consent = $this->normalizeConsentValue($raw);
+        }
+
+        if ($mode === 'require_opt_in') {
+            if ($consent === 'opt_in') {
+                return array('allowed' => true, 'reason' => 'opt_in', 'raw' => $raw);
+            }
+
+            return array('allowed' => false, 'reason' => 'missing_consent', 'raw' => $raw);
+        }
+
+        if ($mode === 'allow_unless_opt_out') {
+            if ($consent === 'opt_out') {
+                return array('allowed' => false, 'reason' => 'opt_out', 'raw' => $raw);
+            }
+
+            return array('allowed' => true, 'reason' => 'not_opted_out', 'raw' => $raw);
+        }
+
+        return array('allowed' => false, 'reason' => 'missing_consent', 'raw' => $raw);
+    }
+
+    private function getPrivateNodeContextDecision($nodeid, $options)
+    {
+        $nodeid = (int) $nodeid;
+        $enabled = $this->getOptionBool($options, 'tornis_tools_ai_disable_context_in_private_nodes', true);
+
+        if (!$enabled) {
+            return array(
+                'blocked' => false,
+                'reason' => 'private_node_protection_disabled',
+                'nodeid' => $nodeid,
+            );
+        }
+
+        if ($nodeid <= 0) {
+            return array(
+                'blocked' => false,
+                'reason' => 'no_nodeid',
+                'nodeid' => $nodeid,
+            );
+        }
+
+        $node = $this->getNodeRow($nodeid);
+
+        if (empty($node)) {
+            return array(
+                'blocked' => true,
+                'reason' => 'private_status_unknown_node_not_found',
+                'nodeid' => $nodeid,
+            );
+        }
+
+        $visited = array();
+        $current = $node;
+
+        for ($depth = 0; $depth < 10; $depth++) {
+            if (empty($current['nodeid'])) {
+                break;
+            }
+
+            $currentNodeId = (int) $current['nodeid'];
+
+            if (isset($visited[$currentNodeId])) {
+                break;
+            }
+
+            $visited[$currentNodeId] = true;
+
+            if ($this->isNodePrivateLike($current)) {
+                return array(
+                    'blocked' => true,
+                    'reason' => 'private_node_detected',
+                    'nodeid' => $nodeid,
+                    'matched_nodeid' => $currentNodeId,
+                );
+            }
+
+            if (empty($current['parentid'])) {
+                break;
+            }
+
+            $parent = $this->getNodeRow((int) $current['parentid']);
+
+            if (empty($parent)) {
+                return array(
+                    'blocked' => true,
+                    'reason' => 'private_status_unknown_parent_not_found',
+                    'nodeid' => $nodeid,
+                    'matched_nodeid' => $currentNodeId,
+                );
+            }
+
+            $current = $parent;
+        }
+
+        return array(
+            'blocked' => false,
+            'reason' => 'no_private_signal_detected',
+            'nodeid' => $nodeid,
+        );
+    }
+
+    private function isNodePrivateLike(array $node)
+    {
+        foreach (array('private', 'isprivate', 'protected', 'isprotected', 'restricted', 'isrestricted') as $field) {
+            if (isset($node[$field]) && (int) $node[$field] > 0) {
+                return true;
+            }
+        }
+
+        foreach (array('public', 'ispublic') as $field) {
+            if (isset($node[$field]) && (string) $node[$field] === '0') {
+                return true;
+            }
+        }
+
+        foreach (array('nodeoptions', 'options') as $field) {
+            if (isset($node[$field]) && is_string($node[$field])) {
+                $value = $this->lower($node[$field]);
+
+                if (strpos($value, 'private') !== false || strpos($value, 'restricted') !== false || strpos($value, 'protected') !== false) {
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
+    private function isNodeHiddenOrModerated(array $node)
+    {
+        foreach (array('showpublished', 'showapproved', 'approved', 'visible') as $field) {
+            if (isset($node[$field]) && (string) $node[$field] === '0') {
+                return true;
+            }
+        }
+
+        foreach (array('deleted', 'softdeleted', 'isdeleted', 'unpublished', 'moderated') as $field) {
+            if (isset($node[$field]) && (int) $node[$field] > 0) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private function getThreadNodes($nodeid, $maxPosts)
@@ -762,7 +1075,7 @@ class vbulletinbytools_Api_Ai extends vB_Api
         return array();
     }
 
-    private function getNodeText($nodeid)
+    private function getNodeText($nodeid, array &$stats)
     {
         foreach (array('vBForum:text', 'text') as $tableName) {
             try {
@@ -774,7 +1087,9 @@ class vbulletinbytools_Api_Ai extends vB_Api
 
                 foreach (array('rawtext', 'pagetext', 'text') as $textField) {
                     if (!empty($row[$textField])) {
-                        return trim(strip_tags((string) $row[$textField]));
+                        $raw = (string) $row[$textField];
+                        $withoutQuotes = $this->stripQuotedContent($raw, $stats);
+                        return trim(strip_tags($withoutQuotes));
                     }
                 }
             } catch (Throwable $e) {
@@ -783,6 +1098,31 @@ class vbulletinbytools_Api_Ai extends vB_Api
         }
 
         return '';
+    }
+
+    private function stripQuotedContent($text, array &$stats)
+    {
+        $text = (string) $text;
+        $before = $text;
+
+        for ($i = 0; $i < 5; $i++) {
+            $next = preg_replace('/\[quote(?:=[^\]]*)?\].*?\[\/quote\]/is', '', $text);
+
+            if ($next === $text) {
+                break;
+            }
+
+            $text = $next;
+        }
+
+        $text = preg_replace('/<blockquote\b[^>]*>.*?<\/blockquote>/is', '', $text);
+        $text = preg_replace('/<div\b[^>]*(?:quote|bbcode_quote)[^>]*>.*?<\/div>/is', '', $text);
+
+        if ($text !== $before) {
+            $stats['context_quotes_stripped']++;
+        }
+
+        return $text;
     }
 
     private function getUsernameByUserId($userid)
@@ -820,6 +1160,26 @@ class vbulletinbytools_Api_Ai extends vB_Api
         }
 
         return (int) $default;
+    }
+
+    private function getOptionBool($options, $name, $default)
+    {
+        if (!isset($options[$name]) || trim((string) $options[$name]) === '') {
+            return (bool) $default;
+        }
+
+        $value = $this->lower((string) $options[$name]);
+        $value = trim($value);
+
+        if (in_array($value, array('1', 'true', 'yes', 'ja', 'on', 'enabled'), true)) {
+            return true;
+        }
+
+        if (in_array($value, array('0', 'false', 'no', 'nej', 'off', 'disabled'), true)) {
+            return false;
+        }
+
+        return (bool) $default;
     }
 
     private function getOptionString($options, $name, $default)
