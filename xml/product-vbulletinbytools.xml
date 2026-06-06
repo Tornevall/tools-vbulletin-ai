@@ -2,7 +2,7 @@
 <product productid="vbulletinbytools" active="1">
 <title>VBulletin by Tornevall Tools</title>
 <description>Tornevall Tools integration for vBulletin, including AI-assisted editor tools through the vBulletin API system.</description>
-<version>1.0.0</version>
+<version>1.0.0-alpha.1</version>
 <url>https://tools.tornevall.net</url>
 <versioncheckurl></versioncheckurl>
 
@@ -12,10 +12,10 @@
 </dependencies>
 
 <codes>
-<code version="1.0.0">
+<code version="1.0.0-alpha.1">
 <installcode><![CDATA[
 /*
- * No install code required.
+ * Settings are declared in product XML options below.
  */
 ]]></installcode>
 <uninstallcode><![CDATA[
@@ -34,11 +34,100 @@
 
 <phrases>
 <phrasetype name="Global" fieldname="global">
-<phrase name="vbulletinbytools" date="1780649500" username="Tornevall" version="1.0.0"><![CDATA[VBulletin by Tornevall Tools]]></phrase>
-<phrase name="vbulletinbytools_settings" date="1780649500" username="Tornevall" version="1.0.0"><![CDATA[Settings]]></phrase>
+<phrase name="vbulletinbytools" date="1780649500" username="Tornevall" version="1.0.0-alpha.1"><![CDATA[VBulletin by Tornevall Tools]]></phrase>
+<phrase name="vbulletinbytools_settings" date="1780649500" username="Tornevall" version="1.0.0-alpha.1"><![CDATA[Settings]]></phrase>
 </phrasetype>
 </phrases>
 
 <options>
+<settinggroup name="vbulletinbytools" displayorder="500">
+<setting varname="tornis_tools_ai_enabled" displayorder="10">
+<title><![CDATA[AI Enabled]]></title>
+<description><![CDATA[Enable or disable the vBulletin AI assistant globally.]]></description>
+<optioncode>yesno</optioncode>
+<defaultvalue>0</defaultvalue>
+<datatype>boolean</datatype>
+</setting>
+<setting varname="tornis_tools_ai_provider" displayorder="20">
+<title><![CDATA[AI Provider]]></title>
+<description><![CDATA[Select which AI backend should handle requests. Tornevall Tools uses https://tools.tornevall.net. Direct OpenAI uses OpenAI API settings below.]]></description>
+<optioncode><![CDATA[<select name="$setting[varname]" tabindex="1" class="bginput">
+<option value="tornevall_tools" " . iif($setting['value'] == 'tornevall_tools', 'selected="selected"') . ">Tornevall Tools</option>
+<option value="openai" " . iif($setting['value'] == 'openai', 'selected="selected"') . ">Direct OpenAI</option>
+</select>]]></optioncode>
+<defaultvalue>tornevall_tools</defaultvalue>
+<datatype>free</datatype>
+</setting>
+<setting varname="tornis_tools_gpt_secret" displayorder="30">
+<title><![CDATA[Tornevall Tools API Token]]></title>
+<description><![CDATA[Bearer token created in https://tools.tornevall.net. Store only the raw token value, without the Bearer prefix. Used when AI Provider is Tornevall Tools.]]></description>
+<optioncode>textarea</optioncode>
+<defaultvalue></defaultvalue>
+<datatype>free</datatype>
+</setting>
+<setting varname="tornis_tools_api_base_url" displayorder="40">
+<title><![CDATA[Tornevall Tools API Base URL]]></title>
+<description><![CDATA[Base URL for Tornevall Tools. Default is https://tools.tornevall.net. Used when AI Provider is Tornevall Tools.]]></description>
+<optioncode>input</optioncode>
+<defaultvalue>https://tools.tornevall.net</defaultvalue>
+<datatype>free</datatype>
+</setting>
+<setting varname="tornis_tools_openai_api_key" displayorder="50">
+<title><![CDATA[OpenAI API Key]]></title>
+<description><![CDATA[OpenAI API key used when AI Provider is Direct OpenAI. Store only the raw key value, without the Bearer prefix.]]></description>
+<optioncode>textarea</optioncode>
+<defaultvalue></defaultvalue>
+<datatype>free</datatype>
+</setting>
+<setting varname="tornis_tools_openai_base_url" displayorder="60">
+<title><![CDATA[OpenAI API Base URL]]></title>
+<description><![CDATA[Base URL for direct OpenAI requests. Default is https://api.openai.com/v1.]]></description>
+<optioncode>input</optioncode>
+<defaultvalue>https://api.openai.com/v1</defaultvalue>
+<datatype>free</datatype>
+</setting>
+<setting varname="tornis_tools_openai_model" displayorder="70">
+<title><![CDATA[OpenAI Model]]></title>
+<description><![CDATA[Model used for direct OpenAI requests.]]></description>
+<optioncode>input</optioncode>
+<defaultvalue>gpt-4o-mini</defaultvalue>
+<datatype>free</datatype>
+</setting>
+<setting varname="tornis_tools_openai_timeout" displayorder="80">
+<title><![CDATA[OpenAI Request Timeout]]></title>
+<description><![CDATA[Timeout in seconds for direct OpenAI API requests.]]></description>
+<optioncode>input</optioncode>
+<defaultvalue>60</defaultvalue>
+<datatype>integer</datatype>
+</setting>
+<setting varname="tornis_tools_ai_client_slug" displayorder="90">
+<title><![CDATA[Tornevall Tools AI Client Slug]]></title>
+<description><![CDATA[Client slug registered in Tornevall Tools. Used when AI Provider is Tornevall Tools.]]></description>
+<optioncode>input</optioncode>
+<defaultvalue>vbulletin_wysiwyg_assistant</defaultvalue>
+<datatype>free</datatype>
+</setting>
+<setting varname="tornis_tools_gpt_persona_field" displayorder="100">
+<title><![CDATA[GPT Persona Profile Field ID]]></title>
+<description><![CDATA[Numeric custom profile field id for the user's AI persona. Example: 67 means userfield.field67. Leave 0 to disable persona loading.]]></description>
+<optioncode>input</optioncode>
+<defaultvalue>0</defaultvalue>
+<datatype>integer</datatype>
+</setting>
+<setting varname="tornis_tools_ai_web_search_enabled" displayorder="110">
+<title><![CDATA[Allow AI Web Search]]></title>
+<description><![CDATA[Allow AI web search when useful. Source-sensitive requests may still force web search. Direct OpenAI uses OpenAI web_search_preview tooling when selected.]]></description>
+<optioncode>yesno</optioncode>
+<defaultvalue>1</defaultvalue>
+<datatype>boolean</datatype>
+</setting>
+<setting varname="tornis_tools_ai_web_search_required" displayorder="120">
+<title><![CDATA[Require AI Web Search]]></title>
+<description><![CDATA[Require web search for all AI requests. Recommended default is No. Source-sensitive requests can still require web search automatically.]]></description>
+<optioncode>yesno</optioncode>
+<defaultvalue>0</defaultvalue>
+<datatype>boolean</datatype>
+</setting>
+</settinggroup>
 </options>
 </product>
