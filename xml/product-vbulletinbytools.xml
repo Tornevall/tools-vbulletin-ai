@@ -128,6 +128,30 @@
 <defaultvalue>0</defaultvalue>
 <datatype>boolean</datatype>
 </setting>
+<setting varname="tornis_tools_ai_context_mode" displayorder="130">
+<title><![CDATA[Default AI Context Mode]]></title>
+<description><![CDATA[Controls how much forum/editor/thread context is sent by default. Profile-level context mode overrides this setting. Values: full or request_only.]]></description>
+<optioncode><![CDATA[<select name="$setting[varname]" tabindex="1" class="bginput">
+<option value="full" " . iif($setting['value'] == 'full', 'selected="selected"') . ">Full context</option>
+<option value="request_only" " . iif($setting['value'] == 'request_only', 'selected="selected"') . ">Request only</option>
+</select>]]></optioncode>
+<defaultvalue>full</defaultvalue>
+<datatype>free</datatype>
+</setting>
+<setting varname="tornis_tools_ai_profile_context_mode_field" displayorder="140">
+<title><![CDATA[Profile Context Mode Field ID]]></title>
+<description><![CDATA[Numeric custom profile field id that lets each user override AI context mode. Accepted values include full, request_only, no_context, full_context, bara_onskemal and hela_kontexten. Leave 0 to disable profile override.]]></description>
+<optioncode>input</optioncode>
+<defaultvalue>0</defaultvalue>
+<datatype>integer</datatype>
+</setting>
+<setting varname="tornis_tools_ai_profile_enabled_field" displayorder="150">
+<title><![CDATA[Profile AI Enabled Field ID]]></title>
+<description><![CDATA[Numeric custom profile field id that lets each user enable or disable AI. Accepted disabled values include no, nej, off, disabled, av, ai_disabled and 0. Leave 0 to disable profile override.]]></description>
+<optioncode>input</optioncode>
+<defaultvalue>0</defaultvalue>
+<datatype>integer</datatype>
+</setting>
 </settinggroup>
 </options>
 </product>
