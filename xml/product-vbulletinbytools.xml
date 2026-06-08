@@ -138,19 +138,44 @@
 <defaultvalue>full</defaultvalue>
 <datatype>free</datatype>
 </setting>
-<setting varname="tornis_tools_ai_profile_context_mode_field" displayorder="140">
+<setting varname="tornis_tools_ai_context_consent_mode" displayorder="140">
+<title><![CDATA[AI Context Consent Mode]]></title>
+<description><![CDATA[Controls per-author consent filtering when thread context is sent. require_opt_in only includes posts from users who explicitly consented. allow_unless_opt_out excludes only users who opted out. disabled turns consent filtering off.]]></description>
+<optioncode><![CDATA[<select name="$setting[varname]" tabindex="1" class="bginput">
+<option value="require_opt_in" " . iif($setting['value'] == 'require_opt_in', 'selected="selected"') . ">Require opt-in</option>
+<option value="allow_unless_opt_out" " . iif($setting['value'] == 'allow_unless_opt_out', 'selected="selected"') . ">Allow unless opt-out</option>
+<option value="disabled" " . iif($setting['value'] == 'disabled', 'selected="selected"') . ">Disabled</option>
+</select>]]></optioncode>
+<defaultvalue>require_opt_in</defaultvalue>
+<datatype>free</datatype>
+</setting>
+<setting varname="tornis_tools_ai_profile_context_mode_field" displayorder="150">
 <title><![CDATA[Profile Context Mode Field ID]]></title>
 <description><![CDATA[Numeric custom profile field id that lets each user override AI context mode. Accepted values include full, request_only, no_context, full_context, bara_onskemal and hela_kontexten. Leave 0 to disable profile override.]]></description>
 <optioncode>input</optioncode>
 <defaultvalue>0</defaultvalue>
 <datatype>integer</datatype>
 </setting>
-<setting varname="tornis_tools_ai_profile_enabled_field" displayorder="150">
+<setting varname="tornis_tools_ai_profile_enabled_field" displayorder="160">
 <title><![CDATA[Profile AI Enabled Field ID]]></title>
 <description><![CDATA[Numeric custom profile field id that lets each user enable or disable AI. Accepted disabled values include no, nej, off, disabled, av, ai_disabled and 0. Leave 0 to disable profile override.]]></description>
 <optioncode>input</optioncode>
 <defaultvalue>0</defaultvalue>
 <datatype>integer</datatype>
+</setting>
+<setting varname="tornis_tools_ai_profile_context_consent_field" displayorder="170">
+<title><![CDATA[Profile Context Consent Field ID]]></title>
+<description><![CDATA[Numeric custom profile field id used for per-user AI context consent. Accepted opt-in values include yes, ja, allow, consent and opt_in. Accepted opt-out values include no, nej, deny, no_consent and opt_out.]]></description>
+<optioncode>input</optioncode>
+<defaultvalue>0</defaultvalue>
+<datatype>integer</datatype>
+</setting>
+<setting varname="tornis_tools_ai_disable_context_in_private_nodes" displayorder="180">
+<title><![CDATA[Disable AI Context in Private Nodes]]></title>
+<description><![CDATA[When enabled, private, closed, restricted or unknown node privacy status blocks thread context and forces request-only behavior for that request. Recommended default is Yes.]]></description>
+<optioncode>yesno</optioncode>
+<defaultvalue>1</defaultvalue>
+<datatype>boolean</datatype>
 </setting>
 </settinggroup>
 </options>
