@@ -33,6 +33,18 @@ This changelog starts from the first repository commit and includes the implemen
   - `tornis_tools_ai_profile_enabled_field` can disable AI per user.
   - Profile-level settings take precedence over AdminCP defaults.
   - Product XML now includes both provider settings and privacy settings in the same settings group.
+- Added consent-aware context filtering:
+  - New AdminCP option `tornis_tools_ai_context_consent_mode` with `require_opt_in`, `allow_unless_opt_out` and `disabled`.
+  - New AdminCP option `tornis_tools_ai_profile_context_consent_field` for per-user consent through a custom profile field.
+  - New AdminCP option `tornis_tools_ai_disable_context_in_private_nodes`, default enabled.
+  - Thread context is now filtered per post author before it is sent to the selected provider.
+  - `require_opt_in` fails closed and only includes posts from users who explicitly opted in.
+  - `allow_unless_opt_out` excludes posts from users who explicitly opted out.
+  - `disabled` turns off consent filtering as an explicit admin decision.
+  - Private, restricted or unknown node privacy status blocks thread context and forces request-only behavior for that request.
+  - Quotes are stripped from server-side thread context before sending.
+  - Hidden, moderated, deleted or unavailable posts are excluded from AI context.
+  - `privacyDebug`, `threadDebug` and AI payload metadata now include consent mode, private-node blocking and context filtering counters.
 
 ## 2026-06-05
 
