@@ -106,7 +106,7 @@ openai|Direct OpenAI]]></optioncode>
 <setting varname="tornis_tools_api_base_url" displayorder="40">
 <title><![CDATA[Tornevall Tools API Base URL]]></title>
 <description><![CDATA[Base URL for Tornevall Tools. Default is https://tools.tornevall.net. Used when AI Provider is Tornevall Tools.]]></description>
-<optioncode>input</optioncode>
+<optioncode></optioncode>
 <defaultvalue>https://tools.tornevall.net</defaultvalue>
 <datatype>free</datatype>
 </setting>
@@ -120,35 +120,35 @@ openai|Direct OpenAI]]></optioncode>
 <setting varname="tornis_tools_openai_base_url" displayorder="60">
 <title><![CDATA[OpenAI API Base URL]]></title>
 <description><![CDATA[Base URL for direct OpenAI requests. Default is https://api.openai.com/v1.]]></description>
-<optioncode>input</optioncode>
+<optioncode></optioncode>
 <defaultvalue>https://api.openai.com/v1</defaultvalue>
 <datatype>free</datatype>
 </setting>
 <setting varname="tornis_tools_openai_model" displayorder="70">
 <title><![CDATA[OpenAI Model]]></title>
 <description><![CDATA[Model used for direct OpenAI requests.]]></description>
-<optioncode>input</optioncode>
+<optioncode></optioncode>
 <defaultvalue>gpt-4o-mini</defaultvalue>
 <datatype>free</datatype>
 </setting>
 <setting varname="tornis_tools_openai_timeout" displayorder="80">
 <title><![CDATA[OpenAI Request Timeout]]></title>
 <description><![CDATA[Timeout in seconds for direct OpenAI API requests.]]></description>
-<optioncode>input</optioncode>
+<optioncode></optioncode>
 <defaultvalue>60</defaultvalue>
 <datatype>integer</datatype>
 </setting>
 <setting varname="tornis_tools_ai_client_slug" displayorder="90">
 <title><![CDATA[Tornevall Tools AI Client Slug]]></title>
 <description><![CDATA[Client slug registered in Tornevall Tools. Used when AI Provider is Tornevall Tools.]]></description>
-<optioncode>input</optioncode>
+<optioncode></optioncode>
 <defaultvalue>vbulletin_wysiwyg_assistant</defaultvalue>
 <datatype>free</datatype>
 </setting>
 <setting varname="tornis_tools_gpt_persona_field" displayorder="100">
 <title><![CDATA[GPT Persona Profile Field ID]]></title>
 <description><![CDATA[Numeric custom profile field id for the user's AI persona. Example: 67 means userfield.field67. Leave 0 to disable persona loading.]]></description>
-<optioncode>input</optioncode>
+<optioncode></optioncode>
 <defaultvalue>0</defaultvalue>
 <datatype>integer</datatype>
 </setting>
@@ -188,21 +188,21 @@ disabled|Disabled]]></optioncode>
 <setting varname="tornis_tools_ai_profile_context_mode_field" displayorder="150">
 <title><![CDATA[Profile Context Mode Field ID]]></title>
 <description><![CDATA[Numeric custom profile field id that lets each user override AI context mode. Accepted values include full, request_only, no_context, full_context, bara_onskemal and hela_kontexten. Leave 0 to disable profile override.]]></description>
-<optioncode>input</optioncode>
+<optioncode></optioncode>
 <defaultvalue>0</defaultvalue>
 <datatype>integer</datatype>
 </setting>
 <setting varname="tornis_tools_ai_profile_enabled_field" displayorder="160">
 <title><![CDATA[Profile AI Enabled Field ID]]></title>
 <description><![CDATA[Numeric custom profile field id that lets each user enable or disable AI. Accepted disabled values include no, nej, off, disabled, av, ai_disabled and 0. Leave 0 to disable profile override.]]></description>
-<optioncode>input</optioncode>
+<optioncode></optioncode>
 <defaultvalue>0</defaultvalue>
 <datatype>integer</datatype>
 </setting>
 <setting varname="tornis_tools_ai_profile_context_consent_field" displayorder="170">
 <title><![CDATA[Profile Context Consent Field ID]]></title>
 <description><![CDATA[Numeric custom profile field id used for per-user AI context consent. Accepted opt-in values include yes, ja, allow, consent and opt_in. Accepted opt-out values include no, nej, deny, no_consent and opt_out.]]></description>
-<optioncode>input</optioncode>
+<optioncode></optioncode>
 <defaultvalue>0</defaultvalue>
 <datatype>integer</datatype>
 </setting>
