@@ -2,7 +2,7 @@
 <product productid="vbulletinbytools" active="1">
 <title>VBulletin by Tornevall Tools</title>
 <description>Tornevall Tools integration for vBulletin, including AI-assisted editor tools through the vBulletin API system.</description>
-<version>1.0.0</version>
+<version>1.0.0-alpha.1</version>
 <url>https://tools.tornevall.net</url>
 <versioncheckurl></versioncheckurl>
 
@@ -12,10 +12,10 @@
 </dependencies>
 
 <codes>
-<code version="1.0.0">
+<code version="1.0.0-alpha.1">
 <installcode><![CDATA[
 /*
- * No install code required.
+ * Settings are declared in product XML options below.
  */
 ]]></installcode>
 <uninstallcode><![CDATA[
@@ -30,15 +30,217 @@
 </templates>
 
 <plugins>
+<plugin active="1" executionorder="5">
+<title><![CDATA[Inject frontend AI assets]]></title>
+<hookname>parse_templates</hookname>
+<phpcode><![CDATA[
+if (defined('VB_AREA') && VB_AREA === 'AdminCP') {
+    return;
+}
+
+$vbtoolsAiCss = '<link rel="stylesheet" href="/js/vbulletinbytools_ai.css?v=21">';
+$vbtoolsAiJs = '<script src="/js/vbulletinbytools_ai.js?v=21"></script>';
+
+if (isset($template_hook) && is_array($template_hook)) {
+    if (isset($template_hook['headinclude'])) {
+        if (strpos($template_hook['headinclude'], 'vbulletinbytools_ai.css') === false) {
+            $template_hook['headinclude'] .= "\n" . $vbtoolsAiCss;
+        }
+    }
+
+    if (isset($template_hook['footer'])) {
+        if (strpos($template_hook['footer'], 'vbulletinbytools_ai.js') === false) {
+            $template_hook['footer'] .= "\n" . $vbtoolsAiJs;
+        }
+    } else {
+        $template_hook['footer'] = "\n" . $vbtoolsAiJs;
+    }
+}
+]]></phpcode>
+</plugin>
 </plugins>
 
 <phrases>
 <phrasetype name="Global" fieldname="global">
-<phrase name="vbulletinbytools" date="1780649500" username="Tornevall" version="1.0.0"><![CDATA[VBulletin by Tornevall Tools]]></phrase>
-<phrase name="vbulletinbytools_settings" date="1780649500" username="Tornevall" version="1.0.0"><![CDATA[Settings]]></phrase>
+<phrase name="vbulletinbytools" date="1780649500" username="Tornevall" version="1.0.0-alpha.1"><![CDATA[VBulletin by Tornevall Tools]]></phrase>
+<phrase name="vbulletinbytools_settings" date="1780649500" username="Tornevall" version="1.0.0-alpha.1"><![CDATA[Settings]]></phrase>
+</phrasetype>
+<phrasetype name="vBulletin Settings" fieldname="vbsettings">
+<phrase name="settinggroup_vbulletinbytools" date="1780649500" username="Tornevall" version="1.0.0-alpha.1"><![CDATA[VBulletin by Tornevall Tools]]></phrase>
+<phrase name="setting_tornis_tools_ai_enabled_title" date="1780649500" username="Tornevall" version="1.0.0-alpha.1"><![CDATA[AI Enabled]]></phrase>
+<phrase name="setting_tornis_tools_ai_enabled_desc" date="1780649500" username="Tornevall" version="1.0.0-alpha.1"><![CDATA[Enable or disable the vBulletin AI assistant globally.]]></phrase>
+<phrase name="setting_tornis_tools_ai_provider_title" date="1780649500" username="Tornevall" version="1.0.0-alpha.1"><![CDATA[AI Provider]]></phrase>
+<phrase name="setting_tornis_tools_ai_provider_desc" date="1780649500" username="Tornevall" version="1.0.0-alpha.1"><![CDATA[Select which AI backend should handle requests. Tornevall Tools uses https://tools.tornevall.net. Direct OpenAI uses OpenAI API settings below.]]></phrase>
+<phrase name="setting_tornis_tools_gpt_secret_title" date="1780649500" username="Tornevall" version="1.0.0-alpha.1"><![CDATA[Tornevall Tools API Token]]></phrase>
+<phrase name="setting_tornis_tools_gpt_secret_desc" date="1780649500" username="Tornevall" version="1.0.0-alpha.1"><![CDATA[Bearer token created in https://tools.tornevall.net. Store only the raw token value, without the Bearer prefix. Used when AI Provider is Tornevall Tools.]]></phrase>
+<phrase name="setting_tornis_tools_api_base_url_title" date="1780649500" username="Tornevall" version="1.0.0-alpha.1"><![CDATA[Tornevall Tools API Base URL]]></phrase>
+<phrase name="setting_tornis_tools_api_base_url_desc" date="1780649500" username="Tornevall" version="1.0.0-alpha.1"><![CDATA[Base URL for Tornevall Tools. Default is https://tools.tornevall.net. Used when AI Provider is Tornevall Tools.]]></phrase>
+<phrase name="setting_tornis_tools_openai_api_key_title" date="1780649500" username="Tornevall" version="1.0.0-alpha.1"><![CDATA[OpenAI API Key]]></phrase>
+<phrase name="setting_tornis_tools_openai_api_key_desc" date="1780649500" username="Tornevall" version="1.0.0-alpha.1"><![CDATA[OpenAI API key used when AI Provider is Direct OpenAI. Store only the raw key value, without the Bearer prefix.]]></phrase>
+<phrase name="setting_tornis_tools_openai_base_url_title" date="1780649500" username="Tornevall" version="1.0.0-alpha.1"><![CDATA[OpenAI API Base URL]]></phrase>
+<phrase name="setting_tornis_tools_openai_base_url_desc" date="1780649500" username="Tornevall" version="1.0.0-alpha.1"><![CDATA[Base URL for direct OpenAI requests. Default is https://api.openai.com/v1.]]></phrase>
+<phrase name="setting_tornis_tools_openai_model_title" date="1780649500" username="Tornevall" version="1.0.0-alpha.1"><![CDATA[OpenAI Model]]></phrase>
+<phrase name="setting_tornis_tools_openai_model_desc" date="1780649500" username="Tornevall" version="1.0.0-alpha.1"><![CDATA[Model used for direct OpenAI requests.]]></phrase>
+<phrase name="setting_tornis_tools_openai_timeout_title" date="1780649500" username="Tornevall" version="1.0.0-alpha.1"><![CDATA[OpenAI Request Timeout]]></phrase>
+<phrase name="setting_tornis_tools_openai_timeout_desc" date="1780649500" username="Tornevall" version="1.0.0-alpha.1"><![CDATA[Timeout in seconds for direct OpenAI API requests.]]></phrase>
+<phrase name="setting_tornis_tools_ai_client_slug_title" date="1780649500" username="Tornevall" version="1.0.0-alpha.1"><![CDATA[Tornevall Tools AI Client Slug]]></phrase>
+<phrase name="setting_tornis_tools_ai_client_slug_desc" date="1780649500" username="Tornevall" version="1.0.0-alpha.1"><![CDATA[Client slug registered in Tornevall Tools. Used when AI Provider is Tornevall Tools.]]></phrase>
+<phrase name="setting_tornis_tools_gpt_persona_field_title" date="1780649500" username="Tornevall" version="1.0.0-alpha.1"><![CDATA[GPT Persona Profile Field ID]]></phrase>
+<phrase name="setting_tornis_tools_gpt_persona_field_desc" date="1780649500" username="Tornevall" version="1.0.0-alpha.1"><![CDATA[Numeric custom profile field id for the user's AI persona. Example: 67 means userfield.field67. Leave 0 to disable persona loading.]]></phrase>
+<phrase name="setting_tornis_tools_ai_web_search_enabled_title" date="1780649500" username="Tornevall" version="1.0.0-alpha.1"><![CDATA[Allow AI Web Search]]></phrase>
+<phrase name="setting_tornis_tools_ai_web_search_enabled_desc" date="1780649500" username="Tornevall" version="1.0.0-alpha.1"><![CDATA[Allow AI web search when useful. Source-sensitive requests may still force web search. Direct OpenAI uses OpenAI web_search_preview tooling when selected.]]></phrase>
+<phrase name="setting_tornis_tools_ai_web_search_required_title" date="1780649500" username="Tornevall" version="1.0.0-alpha.1"><![CDATA[Require AI Web Search]]></phrase>
+<phrase name="setting_tornis_tools_ai_web_search_required_desc" date="1780649500" username="Tornevall" version="1.0.0-alpha.1"><![CDATA[Require web search for all AI requests. Recommended default is No. Source-sensitive requests can still require web search automatically.]]></phrase>
+<phrase name="setting_tornis_tools_ai_context_mode_title" date="1780649500" username="Tornevall" version="1.0.0-alpha.1"><![CDATA[Default AI Context Mode]]></phrase>
+<phrase name="setting_tornis_tools_ai_context_mode_desc" date="1780649500" username="Tornevall" version="1.0.0-alpha.1"><![CDATA[Controls how much forum/editor/thread context is sent by default. Profile-level context mode overrides this setting. Values: full or request_only.]]></phrase>
+<phrase name="setting_tornis_tools_ai_context_consent_mode_title" date="1780649500" username="Tornevall" version="1.0.0-alpha.1"><![CDATA[AI Context Consent Mode]]></phrase>
+<phrase name="setting_tornis_tools_ai_context_consent_mode_desc" date="1780649500" username="Tornevall" version="1.0.0-alpha.1"><![CDATA[Controls per-author consent filtering when thread context is sent. require_opt_in only includes posts from users who explicitly consented. allow_unless_opt_out excludes only users who opted out. disabled turns consent filtering off.]]></phrase>
+<phrase name="setting_tornis_tools_ai_profile_context_mode_field_title" date="1780649500" username="Tornevall" version="1.0.0-alpha.1"><![CDATA[Profile Context Mode Field ID]]></phrase>
+<phrase name="setting_tornis_tools_ai_profile_context_mode_field_desc" date="1780649500" username="Tornevall" version="1.0.0-alpha.1"><![CDATA[Numeric custom profile field id that lets each user override AI context mode. Accepted values include full, request_only, no_context, full_context, bara_onskemal and hela_kontexten. Leave 0 to disable profile override.]]></phrase>
+<phrase name="setting_tornis_tools_ai_profile_enabled_field_title" date="1780649500" username="Tornevall" version="1.0.0-alpha.1"><![CDATA[Profile AI Enabled Field ID]]></phrase>
+<phrase name="setting_tornis_tools_ai_profile_enabled_field_desc" date="1780649500" username="Tornevall" version="1.0.0-alpha.1"><![CDATA[Numeric custom profile field id that lets each user enable or disable AI. Accepted disabled values include no, nej, off, disabled, av, ai_disabled and 0. Leave 0 to disable profile override.]]></phrase>
+<phrase name="setting_tornis_tools_ai_profile_context_consent_field_title" date="1780649500" username="Tornevall" version="1.0.0-alpha.1"><![CDATA[Profile Context Consent Field ID]]></phrase>
+<phrase name="setting_tornis_tools_ai_profile_context_consent_field_desc" date="1780649500" username="Tornevall" version="1.0.0-alpha.1"><![CDATA[Numeric custom profile field id used for per-user AI context consent. Accepted opt-in values include yes, ja, allow, consent and opt_in. Accepted opt-out values include no, nej, deny, no_consent and opt_out.]]></phrase>
+<phrase name="setting_tornis_tools_ai_disable_context_in_private_nodes_title" date="1780649500" username="Tornevall" version="1.0.0-alpha.1"><![CDATA[Disable AI Context in Private Nodes]]></phrase>
+<phrase name="setting_tornis_tools_ai_disable_context_in_private_nodes_desc" date="1780649500" username="Tornevall" version="1.0.0-alpha.1"><![CDATA[When enabled, private, closed, restricted or unknown node privacy status blocks thread context and forces request-only behavior for that request. Recommended default is Yes.]]></phrase>
 </phrasetype>
 </phrases>
 
 <options>
+<settinggroup name="vbulletinbytools" displayorder="500">
+<setting varname="tornis_tools_ai_enabled" displayorder="10">
+<title><![CDATA[AI Enabled]]></title>
+<description><![CDATA[Enable or disable the vBulletin AI assistant globally.]]></description>
+<optioncode>yesno</optioncode>
+<defaultvalue>0</defaultvalue>
+<datatype>boolean</datatype>
+</setting>
+<setting varname="tornis_tools_ai_provider" displayorder="20">
+<title><![CDATA[AI Provider]]></title>
+<description><![CDATA[Select which AI backend should handle requests. Tornevall Tools uses https://tools.tornevall.net. Direct OpenAI uses OpenAI API settings below.]]></description>
+<optioncode><![CDATA[select:piped
+tornevall_tools|Tornevall Tools
+openai|Direct OpenAI]]></optioncode>
+<defaultvalue>tornevall_tools</defaultvalue>
+<datatype>free</datatype>
+</setting>
+<setting varname="tornis_tools_gpt_secret" displayorder="30">
+<title><![CDATA[Tornevall Tools API Token]]></title>
+<description><![CDATA[Bearer token created in https://tools.tornevall.net. Store only the raw token value, without the Bearer prefix. Used when AI Provider is Tornevall Tools.]]></description>
+<optioncode>textarea</optioncode>
+<defaultvalue></defaultvalue>
+<datatype>free</datatype>
+</setting>
+<setting varname="tornis_tools_api_base_url" displayorder="40">
+<title><![CDATA[Tornevall Tools API Base URL]]></title>
+<description><![CDATA[Base URL for Tornevall Tools. Default is https://tools.tornevall.net. Used when AI Provider is Tornevall Tools.]]></description>
+<optioncode></optioncode>
+<defaultvalue>https://tools.tornevall.net</defaultvalue>
+<datatype>free</datatype>
+</setting>
+<setting varname="tornis_tools_openai_api_key" displayorder="50">
+<title><![CDATA[OpenAI API Key]]></title>
+<description><![CDATA[OpenAI API key used when AI Provider is Direct OpenAI. Store only the raw key value, without the Bearer prefix.]]></description>
+<optioncode>textarea</optioncode>
+<defaultvalue></defaultvalue>
+<datatype>free</datatype>
+</setting>
+<setting varname="tornis_tools_openai_base_url" displayorder="60">
+<title><![CDATA[OpenAI API Base URL]]></title>
+<description><![CDATA[Base URL for direct OpenAI requests. Default is https://api.openai.com/v1.]]></description>
+<optioncode></optioncode>
+<defaultvalue>https://api.openai.com/v1</defaultvalue>
+<datatype>free</datatype>
+</setting>
+<setting varname="tornis_tools_openai_model" displayorder="70">
+<title><![CDATA[OpenAI Model]]></title>
+<description><![CDATA[Model used for direct OpenAI requests.]]></description>
+<optioncode></optioncode>
+<defaultvalue>gpt-4o-mini</defaultvalue>
+<datatype>free</datatype>
+</setting>
+<setting varname="tornis_tools_openai_timeout" displayorder="80">
+<title><![CDATA[OpenAI Request Timeout]]></title>
+<description><![CDATA[Timeout in seconds for direct OpenAI API requests.]]></description>
+<optioncode></optioncode>
+<defaultvalue>60</defaultvalue>
+<datatype>integer</datatype>
+</setting>
+<setting varname="tornis_tools_ai_client_slug" displayorder="90">
+<title><![CDATA[Tornevall Tools AI Client Slug]]></title>
+<description><![CDATA[Client slug registered in Tornevall Tools. Used when AI Provider is Tornevall Tools.]]></description>
+<optioncode></optioncode>
+<defaultvalue>vbulletin_wysiwyg_assistant</defaultvalue>
+<datatype>free</datatype>
+</setting>
+<setting varname="tornis_tools_gpt_persona_field" displayorder="100">
+<title><![CDATA[GPT Persona Profile Field ID]]></title>
+<description><![CDATA[Numeric custom profile field id for the user's AI persona. Example: 67 means userfield.field67. Leave 0 to disable persona loading.]]></description>
+<optioncode></optioncode>
+<defaultvalue>0</defaultvalue>
+<datatype>integer</datatype>
+</setting>
+<setting varname="tornis_tools_ai_web_search_enabled" displayorder="110">
+<title><![CDATA[Allow AI Web Search]]></title>
+<description><![CDATA[Allow AI web search when useful. Source-sensitive requests may still force web search. Direct OpenAI uses OpenAI web_search_preview tooling when selected.]]></description>
+<optioncode>yesno</optioncode>
+<defaultvalue>1</defaultvalue>
+<datatype>boolean</datatype>
+</setting>
+<setting varname="tornis_tools_ai_web_search_required" displayorder="120">
+<title><![CDATA[Require AI Web Search]]></title>
+<description><![CDATA[Require web search for all AI requests. Recommended default is No. Source-sensitive requests can still require web search automatically.]]></description>
+<optioncode>yesno</optioncode>
+<defaultvalue>0</defaultvalue>
+<datatype>boolean</datatype>
+</setting>
+<setting varname="tornis_tools_ai_context_mode" displayorder="130">
+<title><![CDATA[Default AI Context Mode]]></title>
+<description><![CDATA[Controls how much forum/editor/thread context is sent by default. Profile-level context mode overrides this setting. Values: full or request_only.]]></description>
+<optioncode><![CDATA[select:piped
+full|Full context
+request_only|Request only]]></optioncode>
+<defaultvalue>full</defaultvalue>
+<datatype>free</datatype>
+</setting>
+<setting varname="tornis_tools_ai_context_consent_mode" displayorder="140">
+<title><![CDATA[AI Context Consent Mode]]></title>
+<description><![CDATA[Controls per-author consent filtering when thread context is sent. require_opt_in only includes posts from users who explicitly consented. allow_unless_opt_out excludes only users who opted out. disabled turns consent filtering off.]]></description>
+<optioncode><![CDATA[select:piped
+require_opt_in|Require opt-in
+allow_unless_opt_out|Allow unless opt-out
+disabled|Disabled]]></optioncode>
+<defaultvalue>require_opt_in</defaultvalue>
+<datatype>free</datatype>
+</setting>
+<setting varname="tornis_tools_ai_profile_context_mode_field" displayorder="150">
+<title><![CDATA[Profile Context Mode Field ID]]></title>
+<description><![CDATA[Numeric custom profile field id that lets each user override AI context mode. Accepted values include full, request_only, no_context, full_context, bara_onskemal and hela_kontexten. Leave 0 to disable profile override.]]></description>
+<optioncode></optioncode>
+<defaultvalue>0</defaultvalue>
+<datatype>integer</datatype>
+</setting>
+<setting varname="tornis_tools_ai_profile_enabled_field" displayorder="160">
+<title><![CDATA[Profile AI Enabled Field ID]]></title>
+<description><![CDATA[Numeric custom profile field id that lets each user enable or disable AI. Accepted disabled values include no, nej, off, disabled, av, ai_disabled and 0. Leave 0 to disable profile override.]]></description>
+<optioncode></optioncode>
+<defaultvalue>0</defaultvalue>
+<datatype>integer</datatype>
+</setting>
+<setting varname="tornis_tools_ai_profile_context_consent_field" displayorder="170">
+<title><![CDATA[Profile Context Consent Field ID]]></title>
+<description><![CDATA[Numeric custom profile field id used for per-user AI context consent. Accepted opt-in values include yes, ja, allow, consent and opt_in. Accepted opt-out values include no, nej, deny, no_consent and opt_out.]]></description>
+<optioncode></optioncode>
+<defaultvalue>0</defaultvalue>
+<datatype>integer</datatype>
+</setting>
+<setting varname="tornis_tools_ai_disable_context_in_private_nodes" displayorder="180">
+<title><![CDATA[Disable AI Context in Private Nodes]]></title>
+<description><![CDATA[When enabled, private, closed, restricted or unknown node privacy status blocks thread context and forces request-only behavior for that request. Recommended default is Yes.]]></description>
+<optioncode>yesno</optioncode>
+<defaultvalue>1</defaultvalue>
+<datatype>boolean</datatype>
+</setting>
+</settinggroup>
 </options>
 </product>
