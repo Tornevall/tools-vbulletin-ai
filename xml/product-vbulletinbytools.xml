@@ -51,10 +51,9 @@
 <setting varname="tornis_tools_ai_provider" displayorder="20">
 <title><![CDATA[AI Provider]]></title>
 <description><![CDATA[Select which AI backend should handle requests. Tornevall Tools uses https://tools.tornevall.net. Direct OpenAI uses OpenAI API settings below.]]></description>
-<optioncode><![CDATA[<select name="$setting[varname]" tabindex="1" class="bginput">
-<option value="tornevall_tools" " . iif($setting['value'] == 'tornevall_tools', 'selected="selected"') . ">Tornevall Tools</option>
-<option value="openai" " . iif($setting['value'] == 'openai', 'selected="selected"') . ">Direct OpenAI</option>
-</select>]]></optioncode>
+<optioncode><![CDATA[select:piped
+tornevall_tools|Tornevall Tools
+openai|Direct OpenAI]]></optioncode>
 <defaultvalue>tornevall_tools</defaultvalue>
 <datatype>free</datatype>
 </setting>
@@ -131,21 +130,19 @@
 <setting varname="tornis_tools_ai_context_mode" displayorder="130">
 <title><![CDATA[Default AI Context Mode]]></title>
 <description><![CDATA[Controls how much forum/editor/thread context is sent by default. Profile-level context mode overrides this setting. Values: full or request_only.]]></description>
-<optioncode><![CDATA[<select name="$setting[varname]" tabindex="1" class="bginput">
-<option value="full" " . iif($setting['value'] == 'full', 'selected="selected"') . ">Full context</option>
-<option value="request_only" " . iif($setting['value'] == 'request_only', 'selected="selected"') . ">Request only</option>
-</select>]]></optioncode>
+<optioncode><![CDATA[select:piped
+full|Full context
+request_only|Request only]]></optioncode>
 <defaultvalue>full</defaultvalue>
 <datatype>free</datatype>
 </setting>
 <setting varname="tornis_tools_ai_context_consent_mode" displayorder="140">
 <title><![CDATA[AI Context Consent Mode]]></title>
 <description><![CDATA[Controls per-author consent filtering when thread context is sent. require_opt_in only includes posts from users who explicitly consented. allow_unless_opt_out excludes only users who opted out. disabled turns consent filtering off.]]></description>
-<optioncode><![CDATA[<select name="$setting[varname]" tabindex="1" class="bginput">
-<option value="require_opt_in" " . iif($setting['value'] == 'require_opt_in', 'selected="selected"') . ">Require opt-in</option>
-<option value="allow_unless_opt_out" " . iif($setting['value'] == 'allow_unless_opt_out', 'selected="selected"') . ">Allow unless opt-out</option>
-<option value="disabled" " . iif($setting['value'] == 'disabled', 'selected="selected"') . ">Disabled</option>
-</select>]]></optioncode>
+<optioncode><![CDATA[select:piped
+require_opt_in|Require opt-in
+allow_unless_opt_out|Allow unless opt-out
+disabled|Disabled]]></optioncode>
 <defaultvalue>require_opt_in</defaultvalue>
 <datatype>free</datatype>
 </setting>
