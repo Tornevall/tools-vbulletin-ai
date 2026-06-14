@@ -38,8 +38,8 @@ if (defined('VB_AREA') && VB_AREA === 'AdminCP') {
     return;
 }
 
-$vbtoolsAiCss = '<link rel="stylesheet" href="/js/vbulletinbytools_ai.css?v=21">';
-$vbtoolsAiJs = '<script src="/js/vbulletinbytools_ai.js?v=21"></script>';
+$vbtoolsAiCss = '<link rel="stylesheet" href="/core/packages/vbulletinbytools/js/vbulletinbytools_ai.css?v=22">';
+$vbtoolsAiJs = '<script src="/core/packages/vbulletinbytools/js/vbulletinbytools_ai.js?v=22"></script>';
 
 if (isset($template_hook) && is_array($template_hook)) {
     if (isset($template_hook['headinclude'])) {
