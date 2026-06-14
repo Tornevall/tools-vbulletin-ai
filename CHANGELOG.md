@@ -45,10 +45,14 @@ This changelog starts from the first repository commit and includes the implemen
   - Quotes are stripped from server-side thread context before sending.
   - Hidden, moderated, deleted or unavailable posts are excluded from AI context.
   - `privacyDebug`, `threadDebug` and AI payload metadata now include consent mode, private-node blocking and context filtering counters.
+- Added a product XML frontend asset injection plugin that attempts to load `/js/vbulletinbytools_ai.css` and `/js/vbulletinbytools_ai.js` through the `parse_templates` hook.
 
 ### Fixed
 
 - Fixed vBulletin AdminCP option rendering for dropdown settings by replacing inline PHP/HTML optioncode with `select:piped` optioncode. This fixes `syntax error, unexpected variable "$setting"` when opening the product options page.
+- Fixed text option rendering in AdminCP by using empty optioncode for normal text/integer settings instead of the literal `input` optioncode.
+- Bumped the package-path frontend loader to load root frontend assets with cache version `v=20` and to include the CSS asset.
+- Added product-level frontend asset injection for the root AI JavaScript and CSS so the editor button is not only dependent on a manual style include.
 
 ## 2026-06-05
 
