@@ -30,6 +30,34 @@
 </templates>
 
 <plugins>
+<plugin active="1" executionorder="5">
+<title><![CDATA[Inject frontend AI assets]]></title>
+<hookname>parse_templates</hookname>
+<phpcode><![CDATA[
+if (defined('VB_AREA') && VB_AREA === 'AdminCP') {
+    return;
+}
+
+$vbtoolsAiCss = '<link rel="stylesheet" href="/js/vbulletinbytools_ai.css?v=21">';
+$vbtoolsAiJs = '<script src="/js/vbulletinbytools_ai.js?v=21"></script>';
+
+if (isset($template_hook) && is_array($template_hook)) {
+    if (isset($template_hook['headinclude'])) {
+        if (strpos($template_hook['headinclude'], 'vbulletinbytools_ai.css') === false) {
+            $template_hook['headinclude'] .= "\n" . $vbtoolsAiCss;
+        }
+    }
+
+    if (isset($template_hook['footer'])) {
+        if (strpos($template_hook['footer'], 'vbulletinbytools_ai.js') === false) {
+            $template_hook['footer'] .= "\n" . $vbtoolsAiJs;
+        }
+    } else {
+        $template_hook['footer'] = "\n" . $vbtoolsAiJs;
+    }
+}
+]]></phpcode>
+</plugin>
 </plugins>
 
 <phrases>
