@@ -19,6 +19,40 @@ This changelog starts from the first repository commit and includes the implemen
 - Added automatic source verification mode for prompts that ask for sources, citations, references, links, facts or fact checking.
 - Added forced Tornevall Tools web search for source-sensitive requests instead of only relying on the global `tornis_tools_ai_web_search_enabled` option.
 - Added stricter prompt rules that forbid invented references and require either verified links/citations or an explicit note that no verified source was found.
+- Added generic AI provider selection:
+  - New AdminCP option `tornis_tools_ai_provider` selects between `tornevall_tools` and `openai`.
+  - Existing Tornevall Tools settings are kept unchanged.
+  - Direct OpenAI settings were added: `tornis_tools_openai_api_key`, `tornis_tools_openai_base_url`, `tornis_tools_openai_model` and `tornis_tools_openai_timeout`.
+  - New `TornevallTools_DirectOpenAiClient` uses the OpenAI Responses API directly.
+  - New `providerDebug` API method reports the selected provider and whether each provider has credentials configured.
+  - Source-sensitive requests continue to force web search. With Direct OpenAI selected, web search is sent through OpenAI `web_search_preview` tooling.
+- Merged AI context privacy controls into the generic provider branch:
+  - `privacyDebug` is available together with `providerDebug`.
+  - `tornis_tools_ai_context_mode` works with both Tornevall Tools and Direct OpenAI.
+  - `tornis_tools_ai_profile_context_mode_field` can override AdminCP context mode per user.
+  - `tornis_tools_ai_profile_enabled_field` can disable AI per user.
+  - Profile-level settings take precedence over AdminCP defaults.
+  - Product XML now includes both provider settings and privacy settings in the same settings group.
+- Added consent-aware context filtering:
+  - New AdminCP option `tornis_tools_ai_context_consent_mode` with `require_opt_in`, `allow_unless_opt_out` and `disabled`.
+  - New AdminCP option `tornis_tools_ai_profile_context_consent_field` for per-user consent through a custom profile field.
+  - New AdminCP option `tornis_tools_ai_disable_context_in_private_nodes`, default enabled.
+  - Thread context is now filtered per post author before it is sent to the selected provider.
+  - `require_opt_in` fails closed and only includes posts from users who explicitly opted in.
+  - `allow_unless_opt_out` excludes posts from users who explicitly opted out.
+  - `disabled` turns off consent filtering as an explicit admin decision.
+  - Private, restricted or unknown node privacy status blocks thread context and forces request-only behavior for that request.
+  - Quotes are stripped from server-side thread context before sending.
+  - Hidden, moderated, deleted or unavailable posts are excluded from AI context.
+  - `privacyDebug`, `threadDebug` and AI payload metadata now include consent mode, private-node blocking and context filtering counters.
+- Added a product XML frontend asset injection plugin that attempts to load `/js/vbulletinbytools_ai.css` and `/js/vbulletinbytools_ai.js` through the `parse_templates` hook.
+
+### Fixed
+
+- Fixed vBulletin AdminCP option rendering for dropdown settings by replacing inline PHP/HTML optioncode with `select:piped` optioncode. This fixes `syntax error, unexpected variable "$setting"` when opening the product options page.
+- Fixed text option rendering in AdminCP by using empty optioncode for normal text/integer settings instead of the literal `input` optioncode.
+- Bumped the package-path frontend loader to load root frontend assets with cache version `v=20` and to include the CSS asset.
+- Added product-level frontend asset injection for the root AI JavaScript and CSS so the editor button is not only dependent on a manual style include.
 
 ## 2026-06-05
 

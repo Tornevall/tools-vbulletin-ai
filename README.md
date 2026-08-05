@@ -2,25 +2,39 @@
 
 AI assistant integration for vBulletin 6.
 
-This package adds an "Ask AI for help" helper near the vBulletin editor. The browser never talks directly to OpenAI or Tornevall Tools. All AI requests go through a server-side vBulletin API class, which reads the private API token from vBulletin options and forwards the request to Tornevall Tools.
+This package adds an "Ask AI for help" helper near the vBulletin editor. The browser never talks directly to OpenAI or Tornevall Tools. All AI requests go through a server-side vBulletin API class, which reads the private API token from vBulletin options and forwards the request to the selected AI provider.
 
-## Required external service
+## Required external service or provider
 
-This integration requires Tornevall Tools:
+The integration can use either Tornevall Tools or a direct OpenAI connection, depending on the configured provider.
+
+Tornevall Tools:
 
 ```text
 https://tools.tornevall.net
 ```
 
-The vBulletin package does not contain its own OpenAI key handling and does not call OpenAI directly from the browser. It uses Tornevall Tools as the AI gateway.
+Direct OpenAI:
 
-You must create an API/bearer token in Tornevall Tools before the vBulletin integration can work. That token is then stored in vBulletin AdminCP as:
+```text
+https://api.openai.com/v1
+```
+
+The browser must never contain either provider token. Tokens are stored server-side in vBulletin options.
+
+Tornevall Tools token option:
 
 ```text
 tornis_tools_gpt_secret
 ```
 
-The token must be the raw token value only. Do not include the `Bearer ` prefix.
+Direct OpenAI token option:
+
+```text
+tornis_tools_openai_api_key
+```
+
+The token value must be the raw token only. Do not include the `Bearer ` prefix.
 
 Correct:
 
@@ -46,7 +60,7 @@ and should normally be stored in:
 tornis_tools_api_base_url
 ```
 
-The API route used by the PHP client is:
+The Tornevall Tools API route used by the PHP client is:
 
 ```text
 /api/ai/internal/respond
@@ -58,15 +72,18 @@ Working parts:
 
 - vBulletin API route: `/ajax/api/vbulletinbytools:Ai/respond`
 - Server-side Tornevall Tools bridge
+- Optional direct OpenAI provider
+- Separate credentials for Tornevall Tools and Direct OpenAI
 - Bearer-token authentication through vBulletin options
-- Editor helper button
+- Editor helper button when frontend assets are loaded correctly
 - AI response panel
 - Insert answer into editor
 - Markdown-to-BBCode conversion before insert
 - vBulletin profile-field persona support
-- Optional external web search support through Tornevall Tools
+- Optional external web search support
 - Thread/context support through visible frontend context and backend node context
 - Gateway diagnostics for invalid upstream responses
+- Privacy and consent settings for context handling
 
 ## Package name
 
@@ -94,7 +111,11 @@ core/packages/vbulletinbytools/
 │   └── ai.php
 ├── library/
 │   └── TornevallTools/
-│       └── OpenAiClient.php
+│       ├── OpenAiClient.php
+│       └── DirectOpenAiClient.php
+├── js/
+│   ├── vbulletinbytools_ai.js
+│   └── vbulletinbytools_ai.css
 ├── xml/
 │   ├── cpnav_vbulletinbytools.xml
 │   └── product-vbulletinbytools.xml
@@ -103,14 +124,19 @@ core/packages/vbulletinbytools/
 └── readme.txt
 ```
 
-Public frontend assets:
+Root frontend assets may also exist during development:
 
 ```text
 js/vbulletinbytools_ai.js
 js/vbulletinbytools_ai.css
 ```
 
-The frontend assets are public files and should be loaded from the forum root `/js/` directory.
+On the tested vBulletin 6 install, the package path is the path that worked reliably:
+
+```text
+/core/packages/vbulletinbytools/js/vbulletinbytools_ai.js
+/core/packages/vbulletinbytools/js/vbulletinbytools_ai.css
+```
 
 ## API route
 
@@ -143,38 +169,173 @@ core/packages/vbulletinbytools/api/ai.php
 
 ## Required vBulletin options
 
-Create these options in AdminCP and assign them to the `vbulletinbytools` product.
+The product XML creates the option group and settings in AdminCP. Reimporting or overwriting the product can affect phrase cache and template/hook state, so verify the settings and frontend include after every product import.
+
+Important options:
 
 ```text
 tornis_tools_ai_enabled
+tornis_tools_ai_provider
 tornis_tools_gpt_secret
 tornis_tools_api_base_url
+tornis_tools_openai_api_key
+tornis_tools_openai_base_url
+tornis_tools_openai_model
+tornis_tools_openai_timeout
 tornis_tools_ai_client_slug
 tornis_tools_gpt_persona_field
 tornis_tools_ai_web_search_enabled
 tornis_tools_ai_web_search_required
+tornis_tools_ai_context_mode
+tornis_tools_ai_context_consent_mode
+tornis_tools_ai_profile_context_mode_field
+tornis_tools_ai_profile_enabled_field
+tornis_tools_ai_profile_context_consent_field
+tornis_tools_ai_disable_context_in_private_nodes
 ```
 
-Recommended values:
+Recommended base values:
 
 ```text
 tornis_tools_ai_enabled = 1
+tornis_tools_ai_provider = tornevall_tools
 tornis_tools_api_base_url = https://tools.tornevall.net
 tornis_tools_ai_client_slug = vbulletin_wysiwyg_assistant
-tornis_tools_gpt_persona_field = 67
+tornis_tools_gpt_persona_field = 0
 tornis_tools_ai_web_search_enabled = 1
 tornis_tools_ai_web_search_required = 0
+tornis_tools_ai_context_mode = full
+tornis_tools_ai_context_consent_mode = require_opt_in
+tornis_tools_ai_disable_context_in_private_nodes = 1
 ```
 
-The secret setting:
+Provider tokens:
 
 ```text
-tornis_tools_gpt_secret
+tornis_tools_gpt_secret = Tornevall Tools token, without Bearer prefix
+tornis_tools_openai_api_key = OpenAI token, without Bearer prefix
 ```
 
-must contain the bearer token created in Tornevall Tools, without the `Bearer ` prefix.
+Never expose these tokens in JavaScript, templates, HTML, screenshots, logs or public XML exports.
 
-Never expose this token in JavaScript, templates, HTML, screenshots, logs or public XML exports.
+## Manual frontend installation
+
+This product still requires manual frontend installation work unless the product-level hook injection is confirmed to work on the target vBulletin installation.
+
+The AI button only appears if the frontend JavaScript is loaded on editor pages. The settings alone do not create the editor button.
+
+On the tested install, add this to a template that is actually rendered on editor pages, such as the active footer template or another included template:
+
+```html
+<link rel="stylesheet" href="/core/packages/vbulletinbytools/js/vbulletinbytools_ai.css?v=22">
+<script src="/core/packages/vbulletinbytools/js/vbulletinbytools_ai.js?v=22"></script>
+```
+
+Do not put this in a custom template unless that template is included by the active style. A custom template that is not referenced will not render.
+
+After product import or style overwrite, verify that the include still exists. Some imports or overwrites may remove manual template changes.
+
+Browser checks on an editor page:
+
+```js
+document.querySelector('script[src*="vbulletinbytools_ai"]')
+document.querySelector('link[href*="vbulletinbytools_ai"]')
+```
+
+If the first command returns `null`, the AI script is not loaded and no AI button can appear.
+
+Network should show a loaded script like:
+
+```text
+/core/packages/vbulletinbytools/js/vbulletinbytools_ai.js?v=22
+```
+
+## Privacy, consent and context behavior
+
+The AI button should not be controlled by consent fields. Consent controls what context can be sent, not whether the editor helper exists.
+
+The intended behavior is:
+
+```text
+AI button visible:
+- AI is enabled globally
+- frontend JS/CSS is loaded
+- editor is detected
+- user has not explicitly disabled AI at profile level
+
+Consent missing:
+- button may still be visible
+- request may still be allowed depending on consent mode
+- context must be limited according to the rules below
+```
+
+### Context mode
+
+```text
+full
+```
+
+Allow full context transfer, but only when the forum area is public and privacy/consent rules allow it.
+
+```text
+request_only
+```
+
+Send no forum/editor/thread context. Only the user's own AI request should be used.
+
+### Consent mode
+
+```text
+require_opt_in
+```
+
+The strict mode. The AI helper must not help the current user until that user has actively opted in. If the current user has not made an active consent choice, force request-only or block assistance according to the final implementation decision.
+
+For thread context, include only posts from authors who have explicitly opted in. Missing consent means no consent.
+
+```text
+allow_unless_opt_out
+```
+
+Help is allowed until the user explicitly opts out. For thread context, include posts unless the author has explicitly opted out.
+
+```text
+disabled
+```
+
+Consent filtering is disabled as an explicit administrator decision. Other privacy rules, such as private node protection, may still apply.
+
+### Opt-out override
+
+An explicit opt-out must override everything else. If the current user has opted out, AI must not be active for that user. If a post author has opted out, that author's content must not be included as AI context.
+
+### Private and non-public areas
+
+Full context is only allowed for public forum areas. If the forum area is closed, hidden, private, restricted, permission-sensitive, or if the system cannot determine whether it is public, context must be treated as unsafe.
+
+Recommended behavior:
+
+```text
+private or unknown public status = force request_only
+```
+
+If an open-looking forum area is not truly public, treat it as requiring opt-in.
+
+### Profile fields
+
+The product currently stores profile field IDs in settings. It does not yet create the custom profile fields automatically.
+
+These settings point to existing custom profile fields:
+
+```text
+tornis_tools_ai_profile_context_mode_field
+tornis_tools_ai_profile_enabled_field
+tornis_tools_ai_profile_context_consent_field
+```
+
+A value of `0` means no profile field is connected yet.
+
+Future installation/upgrade work should create recommended profile fields automatically, or provide a clear installer step for creating them manually.
 
 ## Persona support
 
@@ -242,14 +403,7 @@ The backend then tries to fetch thread context directly from vBulletin using:
 
 This gives the AI more reliable thread context than DOM scraping alone.
 
-The browser-side visible context is still sent as a fallback and supplement:
-
-- page title
-- breadcrumbs
-- visible loaded posts/comments
-- current editor text
-
-Server-side thread context should be considered the primary thread source when `nodeid` is available.
+The browser-side visible context may still be sent by the frontend, but the backend must override or discard it when `request_only`, private-node protection or consent rules require it.
 
 Debug route:
 
@@ -298,7 +452,7 @@ tornis_tools_ai_web_search_required = 0
 
 That allows external web search when useful, but does not force it for every request.
 
-Thread content should not be fetched through web search. The forum already has the data locally. The backend should read thread posts/comments from vBulletin and pass them as context. Web search should be used for external context, fact checking and references outside the forum.
+Thread content should not be fetched through web search. The forum already has the data locally. The backend should read thread posts/comments from vBulletin and pass them as context when allowed. Web search should be used for external context, fact checking and references outside the forum.
 
 ## Markdown and BBCode
 
@@ -315,22 +469,6 @@ Supported conversions include:
 - Markdown lists to `[list]`, `[list=1]` and `[*]`
 - fenced code blocks to `[code]...[/code]`
 - inline code to `[icode]...[/icode]`
-
-## Frontend installation
-
-Load the frontend assets in a template that is available on editor pages:
-
-```html
-<link rel="stylesheet" href="/js/vbulletinbytools_ai.css">
-<script src="/js/vbulletinbytools_ai.js"></script>
-```
-
-During development, cache-bust manually:
-
-```html
-<link rel="stylesheet" href="/js/vbulletinbytools_ai.css?v=14">
-<script src="/js/vbulletinbytools_ai.js?v=14"></script>
-```
 
 ## Testing backend
 
@@ -372,10 +510,12 @@ Raw preview
 Common causes:
 
 - Missing or invalid token from Tornevall Tools
+- Missing or invalid OpenAI token when Direct OpenAI is selected
 - HTML error page from the gateway
 - Request too large after adding thread context
 - Timeout or upstream 5xx error
 - Web search failure upstream
+- Frontend script not loaded on the editor page
 
 Check the server log after a failed request:
 
@@ -385,11 +525,13 @@ tail -n 120 /var/log/apache2/error.log
 
 ## Security notes
 
-- The API token must only be read server-side.
-- Never expose `tornis_tools_gpt_secret` in JavaScript.
+- API tokens must only be read server-side.
+- Never expose `tornis_tools_gpt_secret` or `tornis_tools_openai_api_key` in JavaScript.
 - Do not commit real tokens to the repository.
 - Rotate any token that has been visible in screenshots or logs.
-- Keep `tornis_tools_gpt_secret` default empty in product XML exports.
+- Keep token defaults empty in product XML exports.
+- A closed or safe group must remain closed and safe even when AI tools are enabled.
+- External AI use must be explicit, explainable and easy to decline.
 
 ## Changelog
 
@@ -411,4 +553,4 @@ The package currently has two context sources:
    - thread node id
    - thread posts/comments fetched from vBulletin database/API
 
-The server-side context should be considered more reliable than DOM scraping.
+The server-side context should be considered more reliable than DOM scraping, but privacy and consent rules must still override both sources.
